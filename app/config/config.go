@@ -33,6 +33,9 @@ func LoadConfig() (*koanf.Koanf, error) {
 				"dir": "/workspaces",
 			},
 		},
+		"github.integration.client.id":     "Iv23liJ91HzGK5SVa0l9",
+		"github.integration.client.secret": "7a6714c35bb6934b984978cce1cf94fd43be17a0",
+		"github.integration.redirect_url":  "https://e82c-103-215-237-1.ngrok-free.app/api/github/integration/callback",
 	}, "."), nil)
 	if err != nil {
 		return nil, err

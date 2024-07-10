@@ -3,6 +3,7 @@ package main
 import (
 	"ai-developer/app/client"
 	gitness_git_provider "ai-developer/app/client/git_provider"
+	"ai-developer/app/client/github"
 	"ai-developer/app/client/workspace"
 	"ai-developer/app/config"
 	"ai-developer/app/constants"
@@ -110,6 +111,14 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+
+	err = c.Provide(func(logger *zap.Logger, slackAlert *monitoring.SlackAlert) *github.GithubClient {
+		return github.NewGithubClient(client.NewHttpClient(), logger, slackAlert)
+	})
+	if err != nil {
+		panic(err)
+	}
+
 	// Provide GitnessService
 	err = c.Provide(func(client *gitness_git_provider.GitnessClient) *git_providers.GitnessService {
 		return git_providers.NewGitnessService(client)
@@ -186,6 +195,22 @@ func main() {
 		clientSecret := config.GithubClientSecret()
 		redirectURL := config.GithubRedirectURL()
 		return services.NewGithubOauthService(
+			userService,
+			jwtService,
+			organisationService,
+			clientID,
+			clientSecret,
+			redirectURL,
+		)
+	})
+	if err != nil {
+		panic(err)
+	}
+	err = c.Provide(func(userService *services.UserService, jwtService *services.JWTService, organisationService *services.OrganisationService) *services.GithubIntegrationService {
+		clientID := config.GithubClientId()
+		clientSecret := config.GithubClientSecret()
+		redirectURL := config.GithubRedirectURL()
+		return services.NewGithubIntegrationService(
 			userService,
 			jwtService,
 			organisationService,
@@ -288,6 +313,17 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+
+	err = c.Provide(func(githubIntegrationService *services.GithubIntegrationService, authService *services.AuthService, githubClient *github.GithubClient) *controllers.GithubIntegrationController {
+		clientID := config.GithubClientId()
+		clientSecret := config.GithubClientSecret()
+		redirectURL := config.GithubRedirectURL()
+		return controllers.NewGithubIntegrationController(githubIntegrationService, githubClient, authService, clientID, clientSecret, redirectURL)
+	})
+	if err != nil {
+		panic(err)
+	}
+
 	err = c.Provide(controllers.NewProjectController)
 	err = c.Provide(controllers.NewStoryController)
 	err = c.Provide(func() *controllers.HealthController {
@@ -372,6 +408,7 @@ func main() {
 	err = c.Invoke(func(
 		health *controllers.HealthController,
 		oauth *controllers.OauthController,
+		githubIntegration *controllers.GithubIntegrationController,
 		middleware *middleware.JWTClaims,
 		projectsController *controllers.ProjectController,
 		storiesController *controllers.StoryController,
@@ -430,6 +467,7 @@ func main() {
 		githubAuth := api.Group("/github")
 		githubAuth.GET("/signin", oauth.GithubSignIn)
 		githubAuth.GET("/callback", oauth.GithubCallback)
+		githubAuth.GET("/integration/callback", githubIntegration.OauthCallback)
 
 		projects := api.Group("/projects", middleware.AuthenticateJWT())
 
