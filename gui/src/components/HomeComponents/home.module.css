@@ -1,11 +1,10 @@
-.github_icon {
+.button {
   display: flex;
   align-items: center;
   justify-content: center;
   background-color: #fff;
   color: #000;
-  font-family: 'Public Sans', sans-serif;
-  font-size: 12px;
+  font-size: 14px;
   font-style: normal;
   font-weight: 500;
   line-height: normal;
@@ -30,9 +29,15 @@
 }
 
 .gradient_effect {
+  position: absolute;
   border-radius: 424px;
   background: var(--landing-page-gradient-color);
   filter: blur(300px);
   width: 300px;
   height: 160px;
+  top: -100px;
+}
+
+.divider {
+  background: var(--white-opacity-8);
 }
