@@ -2,27 +2,31 @@ package impl
 
 import (
 	"errors"
+	"fmt"
+	"os"
+	"time"
+	workspaceconfig "workspace-service/app/config"
+	"workspace-service/app/models/dto"
+	"workspace-service/app/services"
+	"workspace-service/app/utils"
+
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/go-git/go-git/v5/plumbing/transport/http"
 	"go.uber.org/zap"
-	"time"
-	workspaceconfig "workspace-service/app/config"
-	"workspace-service/app/models/dto"
-	"workspace-service/app/services"
-	"workspace-service/app/utils"
 )
 
 type DockerWorkspaceService struct {
 	services.WorkspaceService
-	workspaceServiceConfig *workspaceconfig.WorkspaceServiceConfig
+	workspaceServiceConfig       *workspaceconfig.WorkspaceServiceConfig
+	frontendWorkspaceConfig  *workspaceconfig.FrontendWorkspaceConfig
 	logger                 *zap.Logger
 }
 
-func (ws DockerWorkspaceService) CreateWorkspace(workspaceId string, backendTemplate string, remoteURL string, gitnessUser string, gitnessToken string) (*dto.WorkspaceDetails, error) {
-	err := ws.checkAndCreateWorkspaceFromTemplate(workspaceId, backendTemplate, remoteURL, gitnessUser, gitnessToken)
+func (ws DockerWorkspaceService) CreateWorkspace(workspaceId string, backendTemplate string, frontendTemplate *string, remoteURL string, gitnessUser string, gitnessToken string) (*dto.WorkspaceDetails, error) {
+	err := ws.checkAndCreateWorkspaceFromTemplate(workspaceId, backendTemplate, frontendTemplate, remoteURL, gitnessUser, gitnessToken)
 	if err != nil {
 		ws.logger.Error("Failed to check and create workspace from template", zap.Error(err))
 		return nil, err
@@ -35,7 +39,7 @@ func (ws DockerWorkspaceService) CreateWorkspace(workspaceId string, backendTemp
 	return &dto.WorkspaceDetails{
 		WorkspaceId:      workspaceId,
 		BackendTemplate:  &backendTemplate,
-		FrontendTemplate: nil,
+		FrontendTemplate: frontendTemplate,
 		WorkspaceUrl:     &workspaceUrl,
 		FrontendUrl:      &frontendUrl,
 		BackendUrl:       &backendUrl,
@@ -62,7 +66,7 @@ func (ws DockerWorkspaceService) CreateFrontendWorkspace(storyHashId, workspaceI
 
 }
 
-func (ws DockerWorkspaceService) checkAndCreateWorkspaceFromTemplate(workspaceId string, backendTemplate string, remoteURL string, gitnessUser string, gitnessToken string) error {
+func (ws DockerWorkspaceService) checkAndCreateWorkspaceFromTemplate(workspaceId string, backendTemplate string, frontendTemplate *string, remoteURL string, gitnessUser string, gitnessToken string) error {
 	exists, err := utils.CheckIfWorkspaceExists(workspaceId)
 	if err != nil {
 		ws.logger.Error("Failed to check if workspace exists", zap.Error(err))
@@ -76,10 +80,26 @@ func (ws DockerWorkspaceService) checkAndCreateWorkspaceFromTemplate(workspaceId
 
 	ws.logger.Info("Creating workspace from template", zap.String("workspaceId", workspaceId), zap.String("backendTemplate", backendTemplate))
 
+	//copying backend template in root dir
 	err = utils.SudoRsyncFolders("/templates/"+backendTemplate+"/", "/workspaces/"+workspaceId)
 	if err != nil {
 		ws.logger.Error("Failed to rsync folders", zap.Error(err))
 		return err
+	}
+	if frontendTemplate != nil {
+		//creating a frontend folder in the directory
+		frontendPath := "/workspaces/" + workspaceId + "/frontend"
+		err = os.MkdirAll(frontendPath, os.ModePerm)
+		if err != nil {
+			fmt.Println("Error creating directory:", err)
+			return err
+		}
+		//copying frontend template in the /frontend folder
+		err = utils.SudoRsyncFolders("/templates/"+*frontendTemplate+"/", "/workspaces/"+workspaceId+"/frontend")
+		if err != nil {
+			ws.logger.Error("Failed to rsync folders", zap.Error(err))
+			return err
+		}
 	}
 
 	workspacePath := "/workspaces/" + workspaceId
@@ -194,7 +214,8 @@ func (ws DockerWorkspaceService) checkAndCreateWorkspaceFromTemplate(workspaceId
 }
 
 func (ws DockerWorkspaceService) checkAndCreateFrontendWorkspaceFromTemplate(storyHashId string, workspaceId string, frontendTemplate string) error {
-	exists, err := utils.CheckIfFrontendWorkspaceExists(storyHashId, workspaceId)
+	frontendPath := ws.frontendWorkspaceConfig.FrontendWorkspacePath(workspaceId, storyHashId)
+	exists, err := utils.CheckIfDirExists(frontendPath)
 	if err != nil {
 		ws.logger.Error("Failed to check if workspace exists", zap.Error(err))
 		return err
@@ -204,15 +225,21 @@ func (ws DockerWorkspaceService) checkAndCreateFrontendWorkspaceFromTemplate(sto
 		ws.logger.Info("Workspace already exists", zap.String("workspaceId", workspaceId), zap.String("storyHashId", storyHashId))
 		return nil
 	}
-
-	ws.logger.Info("Creating workspace from template", zap.String("workspaceId", workspaceId), zap.String("frontendTemplate", frontendTemplate))
-
-	err = utils.SudoRsyncFolders("/templates/"+frontendTemplate+"/", "/workspaces/"+workspaceId+"/"+storyHashId)
-	if err != nil {
-		ws.logger.Error("Failed to rsync folders", zap.Error(err))
-		return err
+	if !exists{
+		ws.logger.Info("Creating workspace from template", zap.String("workspaceId", workspaceId), zap.String("frontendTemplate", frontendTemplate), zap.String("storyHashId", storyHashId))
+		err = os.MkdirAll(frontendPath, os.ModePerm)
+		if err != nil {
+			fmt.Println("Error creating directory:", err)
+			return err
+		}
+		err = utils.SudoRsyncFolders("/templates/"+frontendTemplate+"/", frontendPath)
+		if err != nil {
+			ws.logger.Error("Failed to rsync folders", zap.Error(err))
+			return err
+		}
 	}
-	workspacePath := "/workspaces/" + workspaceId + "/" + storyHashId
+
+	workspacePath := ws.frontendWorkspaceConfig.FrontendWorkspacePath(workspaceId, storyHashId)
 	err = utils.ChownRWorkspace("1000", "1000", workspacePath)
 	if err != nil {
 		ws.logger.Error("Failed to chown workspace", zap.Error(err))
