@@ -23,7 +23,7 @@ type OrganizationController struct {
 
 func (controller *OrganizationController) FetchOrganizationUsers(c *gin.Context) {
 	var users []*response.UsersResponse
-	organizationID, err := controller.getOrganisationIDFromUserID(c)
+	organizationID, _, err := controller.getOrganisationIDFromUserID(c)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, &response.FetchOrganisationUserResponse{Success: false, Error: err.Error(), Users: nil})
 	}
@@ -43,7 +43,7 @@ func (controller *OrganizationController) InviteUserToOrganisation(c *gin.Contex
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload"})
 		return
 	}
-	organizationID, err := controller.getOrganisationIDFromUserID(c)
+	organizationID, userId, err := controller.getOrganisationIDFromUserID(c)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, &response.SendEmailResponse{
 			Success:   false,
@@ -52,7 +52,7 @@ func (controller *OrganizationController) InviteUserToOrganisation(c *gin.Contex
 		})
 		return
 	}
-	sendEmailResponse, err := controller.organizationService.InviteUserToOrganization(int(organizationID), inviteUserRequest.Email, inviteUserRequest.CurrentUserID)
+	sendEmailResponse, err := controller.organizationService.InviteUserToOrganization(int(organizationID), inviteUserRequest.Email, userId)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, &response.SendEmailResponse{
 			Success:   false,
@@ -82,7 +82,7 @@ func (controller *OrganizationController) RemoveUserFromOrganisation(c *gin.Cont
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload"})
 		return
 	}
-	_, err := controller.getOrganisationIDFromUserID(c)
+	_, _, err := controller.getOrganisationIDFromUserID(c)
 	if err != nil {
 		c.JSON(http.StatusForbidden, &response.FetchOrganisationUserResponse{Success: false, Error: "OrganisationID mismatch", Users: nil})
 		return
@@ -110,21 +110,21 @@ func (controller *OrganizationController) RemoveUserFromOrganisation(c *gin.Cont
 	c.JSON(http.StatusOK, &response.FetchOrganisationUserResponse{Success: true, Error: nil})
 }
 
-func (controller *OrganizationController) getOrganisationIDFromUserID(context *gin.Context) (uint, error) {
+func (controller *OrganizationController) getOrganisationIDFromUserID(context *gin.Context) (uint, int, error) {
 	userID, exists := context.Get("user_id")
 	if !exists {
-		return 0, errors.New("userId not found in context")
+		return 0, 0, errors.New("userId not found in context")
 	}
 	userIDInt, ok := userID.(int)
 	if !ok {
 		context.JSON(http.StatusBadRequest, gin.H{"error": "User ID is not of type int"})
-		return 0, errors.New("userId is not of type int")
+		return 0, 0, errors.New("userId is not of type int")
 	}
 	organisationIdByUserID, err := controller.userService.FetchOrganisationIDByUserID(uint(userIDInt))
 	if err != nil {
-		return 0, err
+		return 0, 0, err
 	}
-	return organisationIdByUserID, nil
+	return organisationIdByUserID, userIDInt, nil
 }
 
 func NewOrganizationController(
