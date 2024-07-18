@@ -6,6 +6,7 @@ import (
 	"ai-developer/app/types/request"
 	"errors"
 	"fmt"
+	"golang.org/x/crypto/bcrypt"
 	"math/rand"
 	"time"
 )
@@ -52,10 +53,15 @@ func (s *UserService) UpdateUserByEmail(email string, user *models.User) error {
 func (s *UserService) HandleUserSignUp(request request.CreateUserRequest, inviteToken string) (*models.User, string, error) {
 	var err error
 	var inviteOrganisationId int
+	hashedPassword, err := s.hashUserPassword(request.Password)
+	if err != nil {
+		fmt.Println("Error while hashing password: ", err.Error())
+		return nil, "", err
+	}
 	newUser := &models.User{
 		Name:     request.Email,
 		Email:    request.Email,
-		Password: request.Password,
+		Password: hashedPassword,
 	}
 	if inviteToken != "" {
 		var inviteEmail string
@@ -81,6 +87,20 @@ func (s *UserService) HandleUserSignUp(request request.CreateUserRequest, invite
 	}
 	return newUser, accessToken, nil
 }
+
+func (s *UserService) hashUserPassword(password string) (string, error) {
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return "", err
+	}
+	return string(hashedPassword), nil
+}
+
+func (s *UserService) VerifyUserPassword(password string, hash string) bool {
+	err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
+	return err == nil
+}
+
 
 func (s *UserService) HandleExistingUserOrg(user *models.User, inviteOrgId int) (*models.User, error) {
 	if inviteOrgId != 0 {
