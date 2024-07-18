@@ -7,10 +7,10 @@ import (
 	"ai-developer/app/services"
 	"ai-developer/app/types/request"
 	"ai-developer/app/types/response"
+	"errors"
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"net/http"
-	"strconv"
 )
 
 type OrganizationController struct {
@@ -23,14 +23,12 @@ type OrganizationController struct {
 
 func (controller *OrganizationController) FetchOrganizationUsers(c *gin.Context) {
 	var users []*response.UserResponse
-	var organizationId = c.Param("organisation_id")
-	var organizationIdInt, err = strconv.Atoi(organizationId)
+	organizationID, err := controller.getOrganisationIDFromUserID(c)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, &response.FetchOrganisationUserResponse{Success: false, Error: "Invalid input for organisation_id", Users: nil})
+		c.JSON(http.StatusBadRequest, &response.FetchOrganisationUserResponse{Success: false, Error: err.Error(), Users: nil})
 	}
-
-	fmt.Println("Fetching org users: ", organizationId)
-	users, err = controller.organizationService.GetOrganizationUsers(uint(organizationIdInt))
+	fmt.Println("Fetching org users: ", organizationID)
+	users, err = controller.organizationService.GetOrganizationUsers(organizationID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, &response.FetchOrganisationUserResponse{Success: false, Error: err.Error(), Users: nil})
 		return
@@ -45,8 +43,7 @@ func (controller *OrganizationController) InviteUserToOrganisation(c *gin.Contex
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload"})
 		return
 	}
-	var organizationId = c.Param("organisation_id")
-	var organizationIdInt, err = strconv.Atoi(organizationId)
+	organizationID, err := controller.getOrganisationIDFromUserID(c)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, &response.SendEmailResponse{
 			Success:   false,
@@ -55,7 +52,7 @@ func (controller *OrganizationController) InviteUserToOrganisation(c *gin.Contex
 		})
 		return
 	}
-	sendEmailResponse, err := controller.organizationService.InviteUserToOrganization(organizationIdInt, inviteUserRequest.Email, inviteUserRequest.CurrentUserID)
+	sendEmailResponse, err := controller.organizationService.InviteUserToOrganization(int(organizationID), inviteUserRequest.Email, inviteUserRequest.CurrentUserID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, &response.SendEmailResponse{
 			Success:   false,
@@ -85,13 +82,11 @@ func (controller *OrganizationController) RemoveUserFromOrganisation(c *gin.Cont
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload"})
 		return
 	}
-	var organizationId = c.Param("organisation_id")
-	var organizationIdInt, err = strconv.Atoi(organizationId)
+	_, err := controller.getOrganisationIDFromUserID(c)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, &response.FetchOrganisationUserResponse{Success: false, Error: "Invalid input for organisation_id", Users: nil})
+		c.JSON(http.StatusForbidden, &response.FetchOrganisationUserResponse{Success: false, Error: "OrganisationID mismatch", Users: nil})
 		return
 	}
-	fmt.Println("User : ", removeOrgUserRequest.UserID, uint(organizationIdInt))
 	user, err := controller.userService.GetUserByID(uint(removeOrgUserRequest.UserID))
 	if user == nil {
 		c.JSON(http.StatusBadRequest, &response.FetchOrganisationUserResponse{Success: false, Error: "User not found"})
@@ -113,6 +108,23 @@ func (controller *OrganizationController) RemoveUserFromOrganisation(c *gin.Cont
 		return
 	}
 	c.JSON(http.StatusOK, &response.FetchOrganisationUserResponse{Success: true, Error: nil})
+}
+
+func (controller *OrganizationController) getOrganisationIDFromUserID(context *gin.Context) (uint, error) {
+	userID, exists := context.Get("user_id")
+	if !exists {
+		return 0, errors.New("userId not found in context")
+	}
+	userIDInt, ok := userID.(int)
+	if !ok {
+		context.JSON(http.StatusBadRequest, gin.H{"error": "User ID is not of type int"})
+		return 0, errors.New("userId is not of type int")
+	}
+	organisationIdByUserID, err := controller.userService.FetchOrganisationIDByUserID(uint(userIDInt))
+	if err != nil {
+		return 0, err
+	}
+	return organisationIdByUserID, nil
 }
 
 func NewOrganizationController(
