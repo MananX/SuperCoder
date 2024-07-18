@@ -74,7 +74,7 @@ func (s *GithubOauthService) HandleGithubCallback(code string, state string) (st
 			organisation := &models.Organisation{
 				Name: s.organisationService.CreateOrganisationName(),
 			}
-			_, err = s.organisationService.CreateOrganisation(organisation)
+			organisation, err = s.organisationService.CreateOrganisation(organisation)
 			hashedPassword, err := s.userService.HashUserPassword(s.userService.CreatePassword())
 			if err != nil {
 				fmt.Println("Error while hashing password: ", err.Error())
@@ -89,7 +89,7 @@ func (s *GithubOauthService) HandleGithubCallback(code string, state string) (st
 			if err != nil {
 				return "", "", "", "", 0, err
 			}
-			_, err = s.userService.CreateUser(user)
+			user, err = s.userService.CreateUser(user)
 			if err != nil {
 				return "", "", "", "", 0, err
 			}

@@ -23,10 +23,7 @@ func (receiver OrganisationUserRepository) CreateOrganisationUser(tx *gorm.DB, o
 
 func (receiver OrganisationUserRepository) GetOrganisationUserByUserIDAndOrganisationID(userID uint, organisationID uint) (*models.OrganisationUser, error) {
 	var organisationUser models.OrganisationUser
-	err := receiver.db.Where("user_id = ? AND organisation_id = ?", userID, organisationID).First(&organisationUser).Error
-	if err != nil {
-		return nil, err
-	}
+	_ = receiver.db.Where("user_id = ? AND organisation_id = ?", userID, organisationID).First(&organisationUser).Error
 	return &organisationUser, nil
 }
 
