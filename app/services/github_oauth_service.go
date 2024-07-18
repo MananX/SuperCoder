@@ -5,6 +5,7 @@ import (
 	"ai-developer/app/repositories"
 	"context"
 	"errors"
+	"fmt"
 	goGithub "github.com/google/go-github/github"
 	"golang.org/x/oauth2"
 	oauthGithub "golang.org/x/oauth2/github"
@@ -70,10 +71,19 @@ func (s *GithubOauthService) HandleGithubCallback(code string, state string) (st
 	user, err := s.userService.GetUserByEmail(primaryEmail)
 	if err != nil {
 		if user == nil {
+			organisation := &models.Organisation{
+				Name: s.organisationService.CreateOrganisationName(),
+			}
+			_, err = s.organisationService.CreateOrganisation(organisation)
+			hashedPassword, err := s.userService.HashUserPassword(s.userService.CreatePassword())
+			if err != nil {
+				fmt.Println("Error while hashing password: ", err.Error())
+				return "", "", "", "", 0, errors.New("error while creating user")
+			}
 			user = &models.User{
 				Name:     name,
 				Email:    primaryEmail,
-				Password: s.userService.CreatePassword(),
+				Password: hashedPassword,
 			}
 			user, err = s.handleNewUserOrg(user, inviteOrgId)
 			if err != nil {
