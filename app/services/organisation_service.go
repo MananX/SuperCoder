@@ -86,15 +86,15 @@ func (s *OrganisationService) GetOrganisationByName(organisationName string) (*m
 	return s.organisationRepo.GetOrganisationByName(organisationName)
 }
 
-func (s *OrganisationService) GetOrganizationUsers(organizationID uint) ([]*response.UserResponse, error) {
+func (s *OrganisationService) GetOrganizationUsers(organizationID uint) ([]*response.UsersResponse, error) {
 	var users, err = s.userRepository.FetchAllUsersByOrganizationId(organizationID)
 	if err != nil {
 		return nil, err
 	}
-	var usersResponse []*response.UserResponse
+	var usersResponse []*response.UsersResponse
 
 	for _, user := range users {
-		mappedUser := &response.UserResponse{
+		mappedUser := &response.UsersResponse{
 			ID:             user.ID,
 			Name:           user.Name,
 			Email:          user.Email,

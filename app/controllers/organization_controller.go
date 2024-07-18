@@ -22,7 +22,7 @@ type OrganizationController struct {
 }
 
 func (controller *OrganizationController) FetchOrganizationUsers(c *gin.Context) {
-	var users []*response.UserResponse
+	var users []*response.UsersResponse
 	organizationID, err := controller.getOrganisationIDFromUserID(c)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, &response.FetchOrganisationUserResponse{Success: false, Error: err.Error(), Users: nil})
