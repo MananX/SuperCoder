@@ -530,9 +530,9 @@ func main() {
 		organizations := api.Group("/organisation")
 		organizations.GET("/handle_invite", organizationController.HandleUserInvite)
 		organizations.Use(middleware.AuthenticateJWT())
-		organizations.GET("/fetch_users", organizationController.FetchOrganizationUsers)
-		organizations.POST("/invite_user", organizationController.InviteUserToOrganisation)
-		organizations.POST("/remove_user", organizationController.RemoveUserFromOrganisation)
+		organizations.GET("/users", organizationController.FetchOrganizationUsers)
+		organizations.POST("/user/invite", organizationController.InviteUserToOrganisation)
+		organizations.POST("/user/remove", organizationController.RemoveUserFromOrganisation)
 
 		// Wrap the socket.io server as Gin handlers for specific routes
 		r.GET("/api/socket.io/*any", middleware.AuthenticateJWT(), gin.WrapH(ioServer))
