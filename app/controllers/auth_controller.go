@@ -129,7 +129,6 @@ func (controller *AuthController) SignIn(c *gin.Context) {
 		existingUser, err = controller.userService.HandleExistingUserOrg(existingUser, inviteOrganisationId, inviteEmail, existingUser.Email)
 	}
 
-	existingUser.Password = ""
 	c.JSON(http.StatusOK, gin.H{"success": true, "user": &response.UserResponse{
 		Id:             existingUser.ID,
 		Name:           existingUser.Name,

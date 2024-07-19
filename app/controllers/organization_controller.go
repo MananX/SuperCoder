@@ -26,8 +26,8 @@ func (controller *OrganizationController) FetchOrganizationUsers(c *gin.Context)
 	organizationID, _, err := controller.getOrganisationIDFromUserID(c)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, &response.FetchOrganisationUserResponse{Success: false, Error: err.Error(), Users: nil})
+		return
 	}
-	fmt.Println("Fetching org users: ", organizationID)
 	users, err = controller.organizationService.GetOrganizationUsers(organizationID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, &response.FetchOrganisationUserResponse{Success: false, Error: err.Error(), Users: nil})
@@ -45,7 +45,7 @@ func (controller *OrganizationController) InviteUserToOrganisation(c *gin.Contex
 	}
 	organizationID, userId, err := controller.getOrganisationIDFromUserID(c)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, &response.SendEmailResponse{
+		c.JSON(http.StatusForbidden, &response.SendEmailResponse{
 			Success:   false,
 			MessageId: "",
 			Error:     err.Error(),
@@ -54,7 +54,7 @@ func (controller *OrganizationController) InviteUserToOrganisation(c *gin.Contex
 	}
 	sendEmailResponse, err := controller.organizationService.InviteUserToOrganization(int(organizationID), inviteUserRequest.Email, userId)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, &response.SendEmailResponse{
+		c.JSON(http.StatusInternalServerError, &response.SendEmailResponse{
 			Success:   false,
 			MessageId: "",
 			Error:     err.Error(),
@@ -82,14 +82,18 @@ func (controller *OrganizationController) RemoveUserFromOrganisation(c *gin.Cont
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload"})
 		return
 	}
-	_, _, err := controller.getOrganisationIDFromUserID(c)
+	organizationID, _, err := controller.getOrganisationIDFromUserID(c)
 	if err != nil {
 		c.JSON(http.StatusForbidden, &response.FetchOrganisationUserResponse{Success: false, Error: "OrganisationID mismatch", Users: nil})
 		return
 	}
 	user, err := controller.userService.GetUserByID(uint(removeOrgUserRequest.UserID))
 	if user == nil {
-		c.JSON(http.StatusBadRequest, &response.FetchOrganisationUserResponse{Success: false, Error: "User not found"})
+		c.JSON(http.StatusNotFound, &response.FetchOrganisationUserResponse{Success: false, Error: "User not found"})
+		return
+	}
+	if user.OrganisationID != organizationID {
+		c.JSON(http.StatusForbidden, &response.FetchOrganisationUserResponse{Success: false, Error: "User does not belong to this organization"})
 		return
 	}
 	organisation := &models.Organisation{
