@@ -65,9 +65,6 @@ func (s *GithubOauthService) HandleGithubCallback(code string, state string) (st
 	if err != nil {
 		return "", "", "", "", 0, err
 	}
-	if userEmail != "" && userEmail != primaryEmail {
-		return "", "", "", "", 0, errors.New("user email and invite email do not match")
-	}
 	user, err := s.userService.GetUserByEmail(primaryEmail)
 	if err != nil {
 		if user == nil {
@@ -85,7 +82,7 @@ func (s *GithubOauthService) HandleGithubCallback(code string, state string) (st
 				Email:    primaryEmail,
 				Password: hashedPassword,
 			}
-			user, err = s.handleNewUserOrg(user, inviteOrgId)
+			user, err = s.handleNewUserOrg(user, inviteOrgId, userEmail, primaryEmail)
 			if err != nil {
 				return "", "", "", "", 0, err
 			}
@@ -101,7 +98,7 @@ func (s *GithubOauthService) HandleGithubCallback(code string, state string) (st
 		}
 	}
 	user.Name = name
-	user, err = s.handleExistingUserOrg(user, inviteOrgId)
+	user, err = s.handleExistingUserOrg(user, inviteOrgId, userEmail, primaryEmail)
 	if err != nil {
 		return "", "", "", "", 0, err
 	}
@@ -140,8 +137,8 @@ func (s *GithubOauthService) DecodeInviteToken(state string) (string, int, error
 	return "", 0, nil
 }
 
-func (s *GithubOauthService) handleExistingUserOrg(user *models.User, inviteOrgId int) (*models.User, error) {
-	if inviteOrgId != 0 {
+func (s *GithubOauthService) handleExistingUserOrg(user *models.User, inviteOrgId int, userEmail string, primaryEmail string) (*models.User, error) {
+	if inviteOrgId != 0 || !(userEmail != "" && userEmail != primaryEmail) {
 		user.OrganisationID = uint(inviteOrgId)
 		orgUser, err := s.organisationUserRepo.GetOrganisationUserByUserIDAndOrganisationID(user.ID, uint(inviteOrgId))
 		if err != nil {
@@ -154,8 +151,8 @@ func (s *GithubOauthService) handleExistingUserOrg(user *models.User, inviteOrgI
 	return user, nil
 }
 
-func (s *GithubOauthService) handleNewUserOrg(user *models.User, inviteOrgId int) (*models.User, error) {
-	if inviteOrgId == 0 {
+func (s *GithubOauthService) handleNewUserOrg(user *models.User, inviteOrgId int, userEmail string, primaryEmail string) (*models.User, error) {
+	if inviteOrgId == 0 || (userEmail != "" && userEmail != primaryEmail) {
 		organisation := &models.Organisation{
 			Name: s.organisationService.CreateOrganisationName(),
 		}

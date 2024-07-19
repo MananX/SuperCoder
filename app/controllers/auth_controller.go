@@ -126,11 +126,7 @@ func (controller *AuthController) SignIn(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		if inviteEmail != existingUser.Email {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invite Email and User Email do not match"})
-			return
-		}
-		existingUser, err = controller.userService.HandleExistingUserOrg(existingUser, inviteOrganisationId)
+		existingUser, err = controller.userService.HandleExistingUserOrg(existingUser, inviteOrganisationId, inviteEmail, existingUser.Email)
 	}
 
 	existingUser.Password = ""
