@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"net/http"
+	"strconv"
 )
 
 type OrganizationController struct {
@@ -77,17 +78,17 @@ func (controller *OrganizationController) HandleUserInvite(c *gin.Context) {
 }
 
 func (controller *OrganizationController) RemoveUserFromOrganisation(c *gin.Context) {
-	var removeOrgUserRequest request.RemoveOrgUserRequest
-	if err := c.ShouldBindJSON(&removeOrgUserRequest); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload"})
-		return
+	userID := c.Query("userID")
+	userIDInt, err := strconv.Atoi(userID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 	}
 	organizationID, _, err := controller.getOrganisationIDFromUserID(c)
 	if err != nil {
 		c.JSON(http.StatusForbidden, &response.FetchOrganisationUserResponse{Success: false, Error: "OrganisationID mismatch", Users: nil})
 		return
 	}
-	user, err := controller.userService.GetUserByID(uint(removeOrgUserRequest.UserID))
+	user, err := controller.userService.GetUserByID(uint(userIDInt))
 	if user == nil {
 		c.JSON(http.StatusNotFound, &response.FetchOrganisationUserResponse{Success: false, Error: "User not found"})
 		return
