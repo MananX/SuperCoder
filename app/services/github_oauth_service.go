@@ -116,53 +116,63 @@ func (s *GithubOauthService) HandleGithubCallback(code string, state string) (st
 }
 
 func (s *GithubOauthService) createOrganisationUser(user *models.User) (*models.OrganisationUser, error) {
-	return s.organisationUserRepo.CreateOrganisationUser(s.organisationUserRepo.GetDB(), &models.OrganisationUser{
-		OrganisationID: user.OrganisationID,
-		UserID:         user.ID,
-		IsActive:       true,
-		CreatedAt:      time.Now(),
-		UpdatedAt:      time.Now(),
-	})
+	orgUser, err := s.organisationUserRepo.GetOrganisationUserByUserIDAndOrganisationID(user.ID, user.OrganisationID)
+	if err != nil {
+		return nil, err
+	}
+	if orgUser == nil {
+		return s.organisationUserRepo.CreateOrganisationUser(s.organisationUserRepo.GetDB(), &models.OrganisationUser{
+			OrganisationID: user.OrganisationID,
+			UserID:         user.ID,
+			IsActive:       true,
+			CreatedAt:      time.Now(),
+			UpdatedAt:      time.Now(),
+		})
+	}
+	return orgUser, nil
 }
 
-func (s *GithubOauthService) DecodeInviteToken(state string) (string, int, error) {
+func (s *GithubOauthService) DecodeInviteToken(state string) (*string, *int, error) {
 	if strings.HasPrefix(state, "token:") {
 		tokenValue := strings.TrimPrefix(state, "token:")
 		userEmail, inviteOrgId, err := s.jwtService.DecodeInviteToken(tokenValue)
 		if err != nil {
-			return "", 0, err
+			return nil, nil, err
 		}
 		return userEmail, inviteOrgId, nil
 	}
-	return "", 0, nil
+	return nil, nil, nil
 }
 
-func (s *GithubOauthService) handleExistingUserOrg(user *models.User, inviteOrgId int, userEmail string, primaryEmail string) (*models.User, error) {
-	if inviteOrgId != 0 || !(userEmail != "" && userEmail != primaryEmail) {
-		user.OrganisationID = uint(inviteOrgId)
-		orgUser, err := s.organisationUserRepo.GetOrganisationUserByUserIDAndOrganisationID(user.ID, uint(inviteOrgId))
+func (s *GithubOauthService) handleExistingUserOrg(user *models.User, inviteOrgId *int, userEmail *string, primaryEmail string) (*models.User, error) {
+	if inviteOrgId == nil {
+		return user, nil
+	}
+	if userEmail != nil && *userEmail != primaryEmail {
+		user.OrganisationID = uint(*inviteOrgId)
+		_, err := s.createOrganisationUser(user)
 		if err != nil {
-			return nil, err
-		}
-		if orgUser == nil {
-			_, err = s.createOrganisationUser(user)
+			fmt.Println("Error while creating Organisation User: ", err.Error())
 		}
 	}
 	return user, nil
 }
 
-func (s *GithubOauthService) handleNewUserOrg(user *models.User, inviteOrgId int, userEmail string, primaryEmail string) (*models.User, error) {
-	if inviteOrgId == 0 || (userEmail != "" && userEmail != primaryEmail) {
+func (s *GithubOauthService) handleNewUserOrg(user *models.User, inviteOrgId *int, userEmail *string, primaryEmail string) (*models.User, error) {
+	if inviteOrgId == nil {
+		return user, nil
+	}
+	if userEmail != nil && *userEmail != primaryEmail {
 		organisation := &models.Organisation{
 			Name: s.organisationService.CreateOrganisationName(),
 		}
-		_, err := s.organisationService.CreateOrganisation(organisation)
+		organisation, err := s.organisationService.CreateOrganisation(organisation)
 		if err != nil {
 			return nil, err
 		}
 		user.OrganisationID = organisation.ID
 	} else {
-		user.OrganisationID = uint(inviteOrgId)
+		user.OrganisationID = uint(*inviteOrgId)
 	}
 	return user, nil
 }

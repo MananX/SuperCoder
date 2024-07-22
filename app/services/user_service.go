@@ -52,8 +52,8 @@ func (s *UserService) UpdateUserByEmail(email string, user *models.User) error {
 
 func (s *UserService) HandleUserSignUp(request request.CreateUserRequest, inviteToken string) (*models.User, string, error) {
 	var err error
-	var inviteOrganisationId int
-	var inviteEmail string
+	var inviteOrganisationId *int
+	var inviteEmail *string
 	hashedPassword, err := s.HashUserPassword(request.Password)
 	if err != nil {
 		fmt.Println("Error while hashing password: ", err.Error())
@@ -69,7 +69,7 @@ func (s *UserService) HandleUserSignUp(request request.CreateUserRequest, invite
 		if err != nil {
 			return nil, "", err
 		}
-		if inviteEmail != request.Email {
+		if *inviteEmail != request.Email {
 			return nil, "", errors.New("invite email and user email do not match")
 		}
 	}
@@ -101,15 +101,15 @@ func (s *UserService) VerifyUserPassword(password string, hash string) bool {
 	return err == nil
 }
 
-func (s *UserService) HandleExistingUserOrg(user *models.User, inviteOrgId int, userEmail string, primaryEmail string) (*models.User, error) {
-	if inviteOrgId != 0 || !(userEmail != "" && userEmail != primaryEmail) {
-		user.OrganisationID = uint(inviteOrgId)
-		orgUser, err := s.organisationUserRepo.GetOrganisationUserByUserIDAndOrganisationID(user.ID, uint(inviteOrgId))
+func (s *UserService) HandleExistingUserOrg(user *models.User, inviteOrgId *int, userEmail *string, primaryEmail string) (*models.User, error) {
+	if inviteOrgId == nil {
+		return user, nil
+	}
+	if userEmail != nil && *userEmail != primaryEmail {
+		user.OrganisationID = uint(*inviteOrgId)
+		_, err := s.createOrganisationUser(user)
 		if err != nil {
-			return nil, err
-		}
-		if orgUser == nil {
-			_, err = s.createOrganisationUser(user)
+			fmt.Println("Error while creating Organisation User: ", err.Error())
 		}
 		err = s.userRepo.UpdateUserByEmail(user.Email, user)
 		if err != nil {
@@ -119,30 +119,40 @@ func (s *UserService) HandleExistingUserOrg(user *models.User, inviteOrgId int, 
 	return user, nil
 }
 
-func (s *UserService) handleNewUserOrg(user *models.User, inviteOrgId int, userEmail string, primaryEmail string) (*models.User, error) {
-	if inviteOrgId == 0 || (userEmail != "" && userEmail != primaryEmail) {
+func (s *UserService) handleNewUserOrg(user *models.User, inviteOrgId *int, userEmail *string, primaryEmail string) (*models.User, error) {
+	if inviteOrgId == nil {
+		return user, nil
+	}
+	if userEmail != nil && *userEmail != primaryEmail {
 		organisation := &models.Organisation{
 			Name: s.orgService.CreateOrganisationName(),
 		}
-		_, err := s.orgService.CreateOrganisation(organisation)
+		organisation, err := s.orgService.CreateOrganisation(organisation)
 		if err != nil {
 			return nil, err
 		}
 		user.OrganisationID = organisation.ID
 	} else {
-		user.OrganisationID = uint(inviteOrgId)
+		user.OrganisationID = uint(*inviteOrgId)
 	}
 	return user, nil
 }
 
 func (s *UserService) createOrganisationUser(user *models.User) (*models.OrganisationUser, error) {
-	return s.organisationUserRepo.CreateOrganisationUser(s.organisationUserRepo.GetDB(), &models.OrganisationUser{
-		OrganisationID: user.OrganisationID,
-		UserID:         user.ID,
-		IsActive:       true,
-		CreatedAt:      time.Now(),
-		UpdatedAt:      time.Now(),
-	})
+	orgUser, err := s.organisationUserRepo.GetOrganisationUserByUserIDAndOrganisationID(user.ID, user.OrganisationID)
+	if err != nil {
+		return nil, err
+	}
+	if orgUser == nil {
+		return s.organisationUserRepo.CreateOrganisationUser(s.organisationUserRepo.GetDB(), &models.OrganisationUser{
+			OrganisationID: user.OrganisationID,
+			UserID:         user.ID,
+			IsActive:       true,
+			CreatedAt:      time.Now(),
+			UpdatedAt:      time.Now(),
+		})
+	}
+	return orgUser, nil
 }
 
 func NewUserService(userRepo *repositories.UserRepository, orgService *OrganisationService, jwtService *JWTService,

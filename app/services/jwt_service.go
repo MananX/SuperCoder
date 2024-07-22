@@ -65,26 +65,26 @@ func (s *JWTService) ValidateToken(tokenString string) (*jwt.Token, error) {
 	return token, err
 }
 
-func (s *JWTService) DecodeInviteToken(tokenString string) (string, int, error) {
+func (s *JWTService) DecodeInviteToken(tokenString string) (*string, *int, error) {
 	token, err := s.ValidateToken(tokenString)
 	if err != nil {
-		return "", 0, err
+		return nil, nil, err
 	}
 
 	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
-		email, ok := claims["user_email"].(string)
+		email, ok := claims["user_email"].(*string)
 		if !ok {
-			return "", 0, errors.New("invalid email in token")
+			return nil, nil, errors.New("invalid email in token")
 		}
 
 		organizationId, ok := claims["organisation_id"].(float64)
 		if !ok {
-			return "", 0, errors.New("invalid organisation_id in token")
+			return nil, nil, errors.New("invalid organisation_id in token")
 		}
-
-		return email, int(organizationId), nil
+		organizationIdInt := int(organizationId)
+		return email, &organizationIdInt, nil
 	}
-	return "", 0, errors.New("invalid token")
+	return nil, nil, errors.New("invalid token")
 }
 
 func (s *JWTService) getJWTExpiryHours() time.Duration {
