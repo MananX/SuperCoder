@@ -3,7 +3,6 @@ package main
 import (
 	"ai-developer/app/client"
 	gitness_git_provider "ai-developer/app/client/git_provider"
-	"ai-developer/app/client/postmark"
 	"ai-developer/app/client/workspace"
 	"ai-developer/app/config"
 	"ai-developer/app/constants"
@@ -141,7 +140,6 @@ func main() {
 		*repositories.PullRequestCommentsRepository,
 		*repositories.LLMAPIKeyRepository,
 		*repositories.DesignStoryReviewRepository,
-		*repositories.OrganisationUserRepository,
 	) {
 		return repositories.NewExecutionOutputRepository(db),
 			repositories.NewProjectRepository(db),
@@ -157,8 +155,7 @@ func main() {
 			repositories.NewPullRequestRepository(db),
 			repositories.NewPullRequestCommentsRepository(db),
 			repositories.NewLLMAPIKeyRepository(db),
-			repositories.NewDesignStoryReviewRepository(db),
-			repositories.NewOrganisationUserRepository(db)
+			repositories.NewDesignStoryReviewRepository(db)
 	})
 	if err != nil {
 		panic(err)
@@ -189,22 +186,7 @@ func main() {
 		panic(err)
 	}
 
-	err = c.Provide(client.NewHttpClient)
-	if err != nil {
-		panic(err)
-	}
-
-	err = c.Provide(postmark.NewPostmarkClient)
-	if err != nil {
-		panic(err)
-	}
-
-	err = c.Provide(services.NewOrganisationService)
-	if err != nil {
-		panic(err)
-	}
-
-	err = c.Provide(func(userService *services.UserService, jwtService *services.JWTService, organisationService *services.OrganisationService, organisationUserRepo *repositories.OrganisationUserRepository) *services.GithubOauthService {
+	err = c.Provide(func(userService *services.UserService, jwtService *services.JWTService, organisationService *services.OrganisationService) *services.GithubOauthService {
 		clientID := config.GithubClientId()
 		clientSecret := config.GithubClientSecret()
 		redirectURL := config.GithubRedirectURL()
@@ -212,7 +194,6 @@ func main() {
 			userService,
 			jwtService,
 			organisationService,
-			organisationUserRepo,
 			clientID,
 			clientSecret,
 			redirectURL,
@@ -222,6 +203,13 @@ func main() {
 		panic(err)
 	}
 	err = c.Provide(services.NewDesignStoryReviewService)
+	if err != nil {
+		panic(err)
+	}
+	err = c.Provide(func(organisationRepo *repositories.OrganisationRepository,
+		gitnessService *git_providers.GitnessService) *services.OrganisationService {
+		return services.NewOrganisationService(organisationRepo, gitnessService)
+	})
 	if err != nil {
 		panic(err)
 	}
@@ -341,7 +329,6 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	err = c.Provide(controllers.NewOrganizationController)
 	err = c.Provide(controllers.NewDesignStoryReviewController)
 	err = c.Provide(controllers.NewPullRequestController)
 	err = c.Provide(controllers.NewLLMAPIKeyController)
@@ -393,7 +380,6 @@ func main() {
 	err = c.Invoke(func(
 		health *controllers.HealthController,
 		auth *controllers.AuthController,
-		organizationController *controllers.OrganizationController,
 		middleware *middleware.JWTClaims,
 		projectsController *controllers.ProjectController,
 		storiesController *controllers.StoryController,
@@ -526,13 +512,6 @@ func main() {
 		authentication.GET("/check_user", auth.CheckUser)
 		authentication.POST("/sign_in", auth.SignIn)
 		authentication.POST("/sign_up", auth.SignUp)
-
-		organizations := api.Group("/organisation")
-		organizations.GET("/handle_invite", organizationController.HandleUserInvite)
-		organizations.Use(middleware.AuthenticateJWT())
-		organizations.GET("/users", organizationController.FetchOrganizationUsers)
-		organizations.POST("/user/invite", organizationController.InviteUserToOrganisation)
-		organizations.DELETE("/user", organizationController.RemoveUserFromOrganisation)
 
 		// Wrap the socket.io server as Gin handlers for specific routes
 		r.GET("/api/socket.io/*any", middleware.AuthenticateJWT(), gin.WrapH(ioServer))

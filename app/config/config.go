@@ -33,9 +33,6 @@ func LoadConfig() (*koanf.Koanf, error) {
 				"dir": "/workspaces",
 			},
 		},
-		"app.url":             "http://localhost:3000",
-		"postmark.base.url":   "https://api.postmarkapp.com",
-		"postmark.from.email": "noreply@superagi.com",
 	}, "."), nil)
 	if err != nil {
 		return nil, err

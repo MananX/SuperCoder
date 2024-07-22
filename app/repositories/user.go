@@ -59,12 +59,3 @@ func (receiver UserRepository) FetchOrganisationIDByUserID(userID uint) (uint, e
 	}
 	return organisationID, nil
 }
-
-func (receiver UserRepository) FetchAllUsersByOrganizationId(organizationID uint) ([]models.User, error) {
-	var users []models.User
-	err := receiver.db.Where("organisation_id = ?", organizationID).Find(&users).Error
-	if err != nil {
-		return nil, err
-	}
-	return users, nil
-}

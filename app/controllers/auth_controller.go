@@ -37,7 +37,6 @@ func (controller *AuthController) GithubSignIn(c *gin.Context) {
 		c.Redirect(http.StatusTemporaryRedirect, redirectURL)
 
 	}
-	inviteToken := c.Query("invite_token")
 	var githubOauthConfig = &oauth2.Config{
 		RedirectURL:  controller.redirectURL,
 		ClientID:     controller.clientID,
@@ -45,18 +44,13 @@ func (controller *AuthController) GithubSignIn(c *gin.Context) {
 		Scopes:       []string{"user:email"},
 		Endpoint:     oauthGithub.Endpoint,
 	}
-	state := "state"
-	if inviteToken != "" {
-		state = "token:" + inviteToken
-	}
-	callback := githubOauthConfig.AuthCodeURL(state, oauth2.AccessTypeOnline)
+	callback := githubOauthConfig.AuthCodeURL("state", oauth2.AccessTypeOnline)
 	c.Redirect(http.StatusTemporaryRedirect, callback)
 }
 
 func (controller *AuthController) GithubCallback(c *gin.Context) {
 	code := c.Query("code")
-	state := c.Query("state")
-	accessToken, name, email, newExists, organisationId, err := controller.githubOauthService.HandleGithubCallback(code, state)
+	accessToken, name, email, newExists, organisationId, err := controller.githubOauthService.HandleGithubCallback(code)
 	if err != nil {
 		c.Redirect(http.StatusTemporaryRedirect, config.GithubFrontendURL()+"/redirect?error="+err.Error())
 		return
@@ -83,7 +77,7 @@ func (controller *AuthController) SignUp(c *gin.Context) {
 	}
 	var existingUser, _ = controller.userService.GetUserByEmail(createUserRequest.Email)
 	if existingUser == nil {
-		var user, accessToken, err = controller.userService.HandleUserSignUp(createUserRequest, c.GetHeader("X-INVITE-TOKEN"))
+		var user, accessToken, err = controller.userService.HandleUserSignUp(createUserRequest)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"success": false, "existing_user": false, "user": nil, "access_token": nil, "error": err.Error()})
 			fmt.Println("Error occurred while creating new user : ", createUserRequest.Email, err)
@@ -107,6 +101,7 @@ func (controller *AuthController) SignIn(c *gin.Context) {
 		return
 	}
 	var existingUser, err = controller.userService.GetUserByEmail(userSignInRequest.Email)
+
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "user": nil, "error": err.Error()})
 		fmt.Println("Error occurred while fetching user : ", userSignInRequest.Email, err)
@@ -119,23 +114,12 @@ func (controller *AuthController) SignIn(c *gin.Context) {
 	}
 
 	var accessToken, _ = controller.jwtService.GenerateToken(int(existingUser.ID), existingUser.Email)
-
-	if c.GetHeader("X-INVITE-TOKEN") != "" {
-		inviteEmail, inviteOrganisationId, err := controller.jwtService.DecodeInviteToken(c.GetHeader("X-INVITE-TOKEN"))
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
-		}
-		existingUser, err = controller.userService.HandleExistingUserOrg(existingUser, inviteOrganisationId, inviteEmail, existingUser.Email)
-	}
-
 	c.JSON(http.StatusOK, gin.H{"success": true, "user": &response.UserResponse{
 		Id:             existingUser.ID,
 		Name:           existingUser.Name,
 		Email:          existingUser.Email,
 		OrganisationID: existingUser.OrganisationID,
 	}, "access_token": accessToken, "error": nil})
-
 }
 
 func (controller *AuthController) CheckUser(c *gin.Context) {
