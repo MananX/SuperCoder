@@ -8,12 +8,13 @@ import (
 	"ai-developer/app/services/git_providers"
 	"ai-developer/app/types/request"
 	"ai-developer/app/types/response"
+	"bytes"
 	"fmt"
+	"html/template"
 	"io"
 	"math/rand"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 )
 
@@ -24,6 +25,11 @@ type OrganisationService struct {
 	JWTService       *JWTService
 	userRepo         *repositories.UserRepository
 	emailService     email.EmailService
+}
+
+type InviteEmailData struct {
+	InvitorEmail string
+	InviteURL    string
 }
 
 func (s *OrganisationService) CreateOrganisationName() string {
@@ -116,14 +122,6 @@ func (s *OrganisationService) InviteUserToOrganization(organisationID int, userE
 		}, err
 	}
 	url := config.AppUrl() + "/api/organisation/handle_invite?invite_token=" + accessToken
-	htmlContent, err := readFile(filepath.Join("/", "go", "email_templates", "invite_email.html"))
-	if err != nil {
-		return &response.SendEmailResponse{
-			Success:   false,
-			MessageId: "",
-			Error:     err.Error(),
-		}, err
-	}
 	currentUser, err := s.userRepo.GetUserByID(uint(currentUserID))
 	if err != nil {
 		return &response.SendEmailResponse{
@@ -132,15 +130,42 @@ func (s *OrganisationService) InviteUserToOrganization(organisationID int, userE
 			Error:     err.Error(),
 		}, err
 	}
-	htmlContent = strings.Replace(htmlContent, "{invitor_email}", currentUser.Email, 1)
-	htmlContent = strings.Replace(htmlContent, "{{ invite_url }}", url, 2)
+	body, err := getHtmlContent(url, currentUser.Email)
+	if err != nil {
+		return &response.SendEmailResponse{
+			Success:   false,
+			MessageId: "",
+			Error:     err.Error(),
+		}, err
+	}
 	sendEmailRequest := &request.SendEmailRequest{
 		ToEmail:     userEmail,
 		Content:     url,
-		HtmlContent: htmlContent,
+		HtmlContent: body,
 		Subject:     "SuperCoder Invite",
 	}
 	return s.emailService.SendOutboundEmail(sendEmailRequest)
+}
+
+func getHtmlContent(url string, currentUserEmail string) (string, error) {
+	data := InviteEmailData{
+		InvitorEmail: currentUserEmail,
+		InviteURL:    url,
+	}
+	htmlContent, err := readFile(filepath.Join("/", "go", "email_templates", "invite_email.html"))
+	if err != nil {
+		return "", err
+	}
+	tmpl, err := template.New("inviteEmail").Parse(htmlContent)
+	if err != nil {
+		return "", err
+	}
+	var body bytes.Buffer
+	err = tmpl.Execute(&body, data)
+	if err != nil {
+		return "", err
+	}
+	return body.String(), nil
 }
 
 func readFile(filePath string) (string, error) {
