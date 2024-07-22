@@ -4,6 +4,7 @@ import Models from '@/app/settings/SettingsOptions/Models';
 import CustomSidebar from '@/components/CustomSidebar/CustomSidebar';
 import imagePath from '@/app/imagePath';
 import BackButton from '@/components/BackButton/BackButton';
+import Users from '@/app/settings/SettingsOptions/Users';
 
 export default function Settings() {
   const options = [
@@ -15,6 +16,14 @@ export default function Settings() {
       icon_css: 'size-4',
       component: <Models />,
     },
+    {
+      key: 'users',
+      text: 'Users',
+      selected: imagePath.usersIconSelected,
+      unselected: imagePath.usersIconUnselected,
+      icon_css: 'size-4',
+      component: <Users />,
+    },
   ];
 
   const handleOptionSelect = (key: string) => {
@@ -23,7 +32,7 @@ export default function Settings() {
 
   return (
     <div className={'mx-[20vw] my-8 flex flex-col gap-3'}>
-      <BackButton id={'settings'} url={'/board'} />
+      <BackButton id={'settings'} />
 
       <CustomSidebar
         id={'settings'}
