@@ -4,15 +4,18 @@ import (
 	"ai-developer/app/models"
 	"ai-developer/app/repositories"
 	"ai-developer/app/types/request"
+	"errors"
 	"fmt"
 	"golang.org/x/crypto/bcrypt"
 	"math/rand"
+	"time"
 )
 
 type UserService struct {
-	userRepo   *repositories.UserRepository
-	orgService *OrganisationService
-	jwtService *JWTService
+	userRepo             *repositories.UserRepository
+	organisationUserRepo *repositories.OrganisationUserRepository
+	orgService           *OrganisationService
+	jwtService           *JWTService
 }
 
 func (s *UserService) GetUserByID(userID uint) (*models.User, error) {
@@ -47,41 +50,41 @@ func (s *UserService) UpdateUserByEmail(email string, user *models.User) error {
 	return s.userRepo.UpdateUserByEmail(email, user)
 }
 
-func (s *UserService) HandleUserSignUp(request request.CreateUserRequest) (*models.User, string, error) {
-	organisation := &models.Organisation{
-		Name: s.orgService.CreateOrganisationName(),
-	}
-	var err error = nil
-	organisation, err = s.orgService.CreateOrganisation(organisation)
-	if err != nil {
-		fmt.Println("Error while creating organization: ", err.Error())
-		return nil, "", err
-	}
-
+func (s *UserService) HandleUserSignUp(request request.CreateUserRequest, inviteToken string) (*models.User, string, error) {
+	var err error
+	var inviteOrganisationId int
+	var inviteEmail string
 	hashedPassword, err := s.HashUserPassword(request.Password)
 	if err != nil {
 		fmt.Println("Error while hashing password: ", err.Error())
 		return nil, "", err
 	}
-
-	var newUser = &models.User{
-		Name:           request.Email,
-		Email:          request.Email,
-		OrganisationID: organisation.ID,
-		Password:       hashedPassword,
+	newUser := &models.User{
+		Name:     request.Email,
+		Email:    request.Email,
+		Password: hashedPassword,
 	}
+	if inviteToken != "" {
+		inviteEmail, inviteOrganisationId, err = s.jwtService.DecodeInviteToken(inviteToken)
+		if err != nil {
+			return nil, "", err
+		}
+		if inviteEmail != request.Email {
+			return nil, "", errors.New("invite email and user email do not match")
+		}
+	}
+	newUser, err = s.handleNewUserOrg(newUser, inviteOrganisationId, inviteEmail, request.Email)
 	newUser, err = s.CreateUser(newUser)
 	if err != nil {
 		fmt.Println("Error while creating user: ", err.Error())
 		return nil, "", err
 	}
-
+	_, err = s.createOrganisationUser(newUser)
 	var accessToken, jwtErr = s.jwtService.GenerateToken(int(newUser.ID), newUser.Email)
 	if jwtErr != nil {
 		fmt.Println(" Jwt error: ", accessToken, jwtErr.Error())
 		return nil, "", nil
 	}
-
 	return newUser, accessToken, nil
 }
 
@@ -98,11 +101,57 @@ func (s *UserService) VerifyUserPassword(password string, hash string) bool {
 	return err == nil
 }
 
-func NewUserService(userRepo *repositories.UserRepository, orgService *OrganisationService, jwtService *JWTService) *UserService {
+func (s *UserService) HandleExistingUserOrg(user *models.User, inviteOrgId int, userEmail string, primaryEmail string) (*models.User, error) {
+	if inviteOrgId != 0 || !(userEmail != "" && userEmail != primaryEmail) {
+		user.OrganisationID = uint(inviteOrgId)
+		orgUser, err := s.organisationUserRepo.GetOrganisationUserByUserIDAndOrganisationID(user.ID, uint(inviteOrgId))
+		if err != nil {
+			return nil, err
+		}
+		if orgUser == nil {
+			_, err = s.createOrganisationUser(user)
+		}
+		err = s.userRepo.UpdateUserByEmail(user.Email, user)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return user, nil
+}
+
+func (s *UserService) handleNewUserOrg(user *models.User, inviteOrgId int, userEmail string, primaryEmail string) (*models.User, error) {
+	if inviteOrgId == 0 || (userEmail != "" && userEmail != primaryEmail) {
+		organisation := &models.Organisation{
+			Name: s.orgService.CreateOrganisationName(),
+		}
+		_, err := s.orgService.CreateOrganisation(organisation)
+		if err != nil {
+			return nil, err
+		}
+		user.OrganisationID = organisation.ID
+	} else {
+		user.OrganisationID = uint(inviteOrgId)
+	}
+	return user, nil
+}
+
+func (s *UserService) createOrganisationUser(user *models.User) (*models.OrganisationUser, error) {
+	return s.organisationUserRepo.CreateOrganisationUser(s.organisationUserRepo.GetDB(), &models.OrganisationUser{
+		OrganisationID: user.OrganisationID,
+		UserID:         user.ID,
+		IsActive:       true,
+		CreatedAt:      time.Now(),
+		UpdatedAt:      time.Now(),
+	})
+}
+
+func NewUserService(userRepo *repositories.UserRepository, orgService *OrganisationService, jwtService *JWTService,
+	organisationUserRepo *repositories.OrganisationUserRepository) *UserService {
 	return &UserService{
-		userRepo:   userRepo,
-		orgService: orgService,
-		jwtService: jwtService,
+		userRepo:             userRepo,
+		orgService:           orgService,
+		jwtService:           jwtService,
+		organisationUserRepo: organisationUserRepo,
 	}
 }
 
