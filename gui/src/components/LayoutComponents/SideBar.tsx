@@ -1,30 +1,14 @@
 'use client';
-import React, { useMemo, useCallback, useEffect } from 'react';
+import React, { useMemo, useCallback } from 'react';
 import Image from 'next/image';
 import './style.css';
 import { sidebarOptions } from '@/app/constants/SidebarConstants';
 import { SidebarOption } from '../../../types/sidebarTypes';
 import { usePathname, useRouter } from 'next/navigation';
-import { getProjectById } from '@/api/DashboardService';
 
 const SideBar: React.FC = () => {
   const router = useRouter();
   const pathname = usePathname();
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      checkProjectValidity().then().catch();
-    }
-  }, []);
-
-  async function checkProjectValidity() {
-    try {
-      const project_id = localStorage.getItem('projectId');
-      await getProjectById(project_id);
-    } catch (error) {
-      router.push('/projects');
-    }
-  }
 
   const handleOptionClick = useCallback(
     (option: SidebarOption) => {

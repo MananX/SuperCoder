@@ -15,7 +15,6 @@ import {
   EditDesignStoryPayload,
 } from '../../types/designStoryTypes';
 import { authPayload } from '../../types/authTypes';
-import { InviteUserPayload } from '../../types/organisationTypes';
 
 export const checkHealth = () => {
   return api.get(`/health`);
@@ -28,14 +27,12 @@ export const checkUserEmailExists = (user_email: string) => {
   });
 };
 
-export const login = ({ inviteToken, ...payload }: authPayload) => {
-  const headers = inviteToken ? { 'X-INVITE-TOKEN': inviteToken } : {};
-  return api.post(`/auth/sign_in`, payload, { headers });
+export const login = (payload: authPayload) => {
+  return api.post(`/auth/sign_in`, payload);
 };
 
-export const signUp = ({ inviteToken, ...payload }: authPayload) => {
-  const headers = inviteToken ? { 'X-INVITE-TOKEN': inviteToken } : {};
-  return api.post(`/auth/sign_up`, payload, { headers });
+export const signUp = (payload: authPayload) => {
+  return api.post(`/auth/sign_up`, payload);
 };
 
 // Project APIs
@@ -182,17 +179,4 @@ export const rebuildDesignStory = (
 
 export const updateReviewViewedStatus = (story_id: number) => {
   return api.put(`/stories/design/review_viewed/${story_id}`, {});
-};
-
-// Teams APIS
-export const getOrganisationMembers = () => {
-  return api.get(`/organisation/users`);
-};
-
-export const addUserToOrganisation = (payload: InviteUserPayload) => {
-  return api.post(`/organisation/user/invite`, payload);
-};
-
-export const removeUserFromOrganisation = (userID: number) => {
-  return api.delete(`/organisation/user`, { params: { userID: userID } });
 };

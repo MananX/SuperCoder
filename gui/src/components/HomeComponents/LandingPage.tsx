@@ -9,47 +9,35 @@ import {
   signUp,
 } from '@/api/DashboardService';
 import { Button } from '@nextui-org/react';
-import React, { useEffect, useState, Suspense } from 'react';
+import { useEffect, useState } from 'react';
 import { API_BASE_URL } from '@/api/apiConfig';
 import CustomInput from '@/components/CustomInput/CustomInput';
 import { authPayload, userData } from '../../../types/authTypes';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { setUserData, validateEmail } from '@/app/utils';
-import toast, { Toaster } from 'react-hot-toast';
 
 export default function LandingPage() {
   const [email, setEmail] = useState<string>('');
   const [password, setPassword] = useState<string>('');
+  const [showPassword, setShowPassword] = useState<boolean>(false);
   const [isEmailRegistered, setIsEmailRegistered] = useState<boolean | null>(
     null,
   );
   const [emailErrorMsg, setEmailErrorMsg] = useState<string>('');
   const [passwordErrorMsg, setPasswordErrorMsg] = useState<string>('');
   const [isButtonLoading, setIsButtonLoading] = useState<boolean>(false);
-  const [inviteToken, setInviteToken] = useState<string | null>(null);
 
   const router = useRouter();
-  const searchParams = useSearchParams();
 
   useEffect(() => {
     toCheckHealth().then().catch();
-    const email = searchParams.get('user_email');
-    const inviteToken = searchParams.get('invite_token');
-    const error = searchParams.get('error_msg');
-    if (error) {
-      toast.error('The invite link has expired.');
-    } else if (email && inviteToken) {
-      setEmail(email);
-      setInviteToken(inviteToken);
-      toCheckUserEmail(email).then().catch();
-    }
   }, []);
 
   useEffect(() => {
     const handleKeyDown = (event) => {
       if (event.key === 'Enter') {
         if (isEmailRegistered === null) {
-          toCheckUserEmail(email).then().catch();
+          toCheckUserEmail().then().catch();
         } else if (isEmailRegistered) {
           loginUser().then().catch();
         } else {
@@ -77,11 +65,7 @@ export default function LandingPage() {
 
   async function forGithubSignIn() {
     try {
-      let url = `${API_BASE_URL}/github/signin`;
-      if (inviteToken) {
-        url = `${API_BASE_URL}/github/signin?invite_token=${inviteToken}`;
-      }
-      window.location.href = url;
+      window.location.href = `${API_BASE_URL}/github/signin`;
     } catch (error) {
       console.error('Error: ', error);
     }
@@ -91,6 +75,7 @@ export default function LandingPage() {
     setEmail(value);
     setIsEmailRegistered(null);
     setPassword('');
+    setShowPassword(false);
     setEmailErrorMsg('');
     setPasswordErrorMsg('');
   };
@@ -109,7 +94,7 @@ export default function LandingPage() {
     setUserData(userData);
   };
 
-  async function toCheckUserEmail(email) {
+  async function toCheckUserEmail() {
     try {
       if (!validateEmail(email)) {
         setEmailErrorMsg('Enter a Valid Email.');
@@ -139,9 +124,6 @@ export default function LandingPage() {
         email: email,
         password: password,
       };
-      if (inviteToken) {
-        payload.inviteToken = inviteToken;
-      }
       const response = await login(payload);
       if (response) {
         const data = response.data;
@@ -170,9 +152,6 @@ export default function LandingPage() {
         email: email,
         password: password,
       };
-      if (inviteToken) {
-        payload.inviteToken = inviteToken;
-      }
       const response = await signUp(payload);
       if (response) {
         const data = response.data;
@@ -191,7 +170,7 @@ export default function LandingPage() {
   const getButtonFields = () => {
     switch (isEmailRegistered) {
       case null:
-        return { text: 'Continue', onClick: () => toCheckUserEmail(email) };
+        return { text: 'Continue', onClick: toCheckUserEmail };
       case true:
         return { text: 'Sign In', onClick: loginUser };
       case false:
@@ -200,84 +179,89 @@ export default function LandingPage() {
   };
 
   return (
-    <Suspense fallback={<div>Loading...</div>}>
-      <div
-        id={'landing_page'}
-        className={`flex h-screen w-screen flex-col px-14 py-10 text-white ${styles.bg_color}`}
-      >
+    <div
+      id={'landing_page'}
+      className={`flex h-screen w-screen flex-col px-14 py-10 text-white ${styles.bg_color}`}
+    >
+      <CustomImage
+        className={'h-[32px] w-[166px]'}
+        src={imagePath.superagiLogo}
+        alt={'superagi_logo'}
+      />
+
+      <div className={'proxima_nova flex flex-col  self-center'}>
+        <div className={styles.gradient_effect} />
+
         <CustomImage
-          className={'h-[32px] w-[166px]'}
-          src={imagePath.superagiLogo}
-          alt={'superagi_logo'}
+          className={'h-[232px] w-[390px]'}
+          src={imagePath.supercoderImage}
+          alt={'super_coder_image'}
         />
-
-        <div className={'proxima_nova flex flex-col  self-center'}>
-          <div className={styles.gradient_effect} />
-
-          <CustomImage
-            className={'h-[232px] w-[390px]'}
-            src={imagePath.supercoderImage}
-            alt={'super_coder_image'}
-          />
-          <div className={'mt-20 flex w-full flex-col gap-6'}>
-            <Button
-              onClick={() => forGithubSignIn()}
-              className={`primary_medium`}
-            >
-              <CustomImage
-                className={'size-5'}
-                src={imagePath.githubLogo}
-                alt={'github_logo'}
+        <div className={'mt-20 flex w-full flex-col gap-6'}>
+          <Button
+            onClick={() => forGithubSignIn()}
+            className={`primary_medium`}
+          >
+            <CustomImage
+              className={'size-5'}
+              src={imagePath.githubLogo}
+              alt={'github_logo'}
+            />
+            Continue with Github
+          </Button>
+          <div className="flex items-center">
+            <div className={`h-px flex-grow ${styles.divider}`} />
+            <span className="secondary_color px-2 text-sm">or</span>
+            <div className={`h-px flex-grow ${styles.divider}`} />
+          </div>
+          <div className={'flex flex-col gap-4'}>
+            <div className={'flex flex-col gap-2'}>
+              <span className={'secondary_color text-sm'}>Email</span>
+              <CustomInput
+                placeholder={'Enter your email'}
+                format={'text'}
+                value={email}
+                setter={onSetEmail}
+                disabled={false}
+                isError={emailErrorMsg !== ''}
+                errorMessage={emailErrorMsg}
               />
-              Continue with Github
-            </Button>
-            <div className="flex items-center">
-              <div className={`h-px flex-grow ${styles.divider}`} />
-              <span className="secondary_color px-2 text-sm">or</span>
-              <div className={`h-px flex-grow ${styles.divider}`} />
             </div>
-            <div className={'flex flex-col gap-4'}>
+            {isEmailRegistered !== null && (
               <div className={'flex flex-col gap-2'}>
-                <span className={'secondary_color text-sm'}>Email</span>
+                <span className={'secondary_color text-sm'}>Password</span>
                 <CustomInput
-                  placeholder={'Enter your email'}
-                  format={'text'}
-                  value={email}
-                  setter={onSetEmail}
-                  disabled={inviteToken !== null}
-                  isError={emailErrorMsg !== ''}
-                  errorMessage={emailErrorMsg}
+                  placeholder={
+                    isEmailRegistered ? 'Enter Password' : 'Set Password'
+                  }
+                  format={showPassword ? 'text' : 'password'}
+                  value={password}
+                  setter={onSetPassword}
+                  endIcon={
+                    showPassword
+                      ? imagePath.passwordUnhidden
+                      : imagePath.passwordHidden
+                  }
+                  alt={'password_icons'}
+                  endIconSize={'size-4'}
+                  endIconClick={() =>
+                    setShowPassword((prevState) => !prevState)
+                  }
+                  errorMessage={passwordErrorMsg}
+                  isError={passwordErrorMsg !== ''}
                 />
               </div>
-              {isEmailRegistered !== null && (
-                <div className={'flex flex-col gap-2'}>
-                  <span className={'secondary_color text-sm'}>Password</span>
-                  <CustomInput
-                    placeholder={
-                      isEmailRegistered ? 'Enter Password' : 'Set Password'
-                    }
-                    format={'password'}
-                    value={password}
-                    setter={onSetPassword}
-                    alt={'password_icons'}
-                    endIconSize={'size-4'}
-                    errorMessage={passwordErrorMsg}
-                    isError={passwordErrorMsg !== ''}
-                  />
-                </div>
-              )}
-            </div>
-            <Button
-              onClick={getButtonFields().onClick}
-              className={`primary_medium`}
-              isLoading={isButtonLoading}
-            >
-              {getButtonFields().text}
-            </Button>
+            )}
           </div>
+          <Button
+            onClick={getButtonFields().onClick}
+            className={`primary_medium`}
+            isLoading={isButtonLoading}
+          >
+            {getButtonFields().text}
+          </Button>
         </div>
-        <Toaster />
       </div>
-    </Suspense>
+    </div>
   );
 }

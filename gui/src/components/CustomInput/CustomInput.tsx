@@ -1,7 +1,6 @@
-import React, { useState } from 'react';
+import React from 'react';
 import CustomImage from '@/components/ImageComponents/CustomImage';
 import styles from './input.module.css';
-import imagePath from '@/app/imagePath';
 
 interface CustomInputProps {
   format: string;
@@ -20,6 +19,7 @@ interface CustomInputProps {
   endIcon?: string;
   endIconSize?: string;
   endIconBackCSS?: string;
+  endIconClick?: () => void;
 }
 
 const CustomInput: React.FC<CustomInputProps> = ({
@@ -39,8 +39,8 @@ const CustomInput: React.FC<CustomInputProps> = ({
   endIcon,
   endIconSize,
   endIconBackCSS,
+  endIconClick,
 }) => {
-  const [showPassword, setShowPassword] = useState<boolean>(false);
   const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = event.target.value;
     setter(newValue);
@@ -57,13 +57,6 @@ const CustomInput: React.FC<CustomInputProps> = ({
     },
   };
 
-  const isPassword = format === 'password';
-  const inputType = isPassword && showPassword ? 'text' : format;
-
-  const togglePasswordVisibility = () => {
-    setShowPassword((prevState) => !prevState);
-  };
-
   return (
     <div id={'custom_input'} className={'flex w-full flex-col'}>
       <div
@@ -75,32 +68,20 @@ const CustomInput: React.FC<CustomInputProps> = ({
           <CustomImage className={`${size} ${iconCSS}`} src={icon} alt={alt} />
         )}
         <input
-          type={inputType}
+          type={format}
           value={value}
           onChange={handleChange}
           placeholder={placeholder}
           className={`w-full ${types[type].text} outline-0`}
           disabled={disabled}
         />
-        {isPassword ? (
+        {endIcon && (
           <CustomImage
             className={`${endIconSize} ${endIconBackCSS}`}
-            src={
-              showPassword
-                ? imagePath.passwordUnhidden
-                : imagePath.passwordHidden
-            }
+            src={endIcon}
             alt={alt}
-            onClick={togglePasswordVisibility}
+            onClick={endIconClick}
           />
-        ) : (
-          endIcon && (
-            <CustomImage
-              className={`${endIconSize} ${endIconBackCSS}`}
-              src={endIcon}
-              alt={alt}
-            />
-          )
         )}
       </div>
       {isError && errorMessage && (

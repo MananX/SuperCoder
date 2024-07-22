@@ -4,19 +4,11 @@ import { useRouter } from 'next/navigation';
 
 interface BackButtonProps {
   id: string;
-  url?: string;
+  url: string;
 }
 
-export default function BackButton({ id, url = null }: BackButtonProps) {
+export default function BackButton({ id, url }: BackButtonProps) {
   const router = useRouter();
-
-  const handleBack = () => {
-    if (url) {
-      router.push(url);
-    } else {
-      router.back();
-    }
-  };
 
   return (
     <div
@@ -24,7 +16,7 @@ export default function BackButton({ id, url = null }: BackButtonProps) {
       className={
         'flex w-fit cursor-pointer flex-row items-center justify-center gap-1'
       }
-      onClick={handleBack}
+      onClick={() => router.push(url)}
     >
       <CustomImage
         className={'size-4'}
