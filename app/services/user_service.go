@@ -120,10 +120,7 @@ func (s *UserService) HandleExistingUserOrg(user *models.User, inviteOrgId *int,
 }
 
 func (s *UserService) handleNewUserOrg(user *models.User, inviteOrgId *int, userEmail *string, primaryEmail string) (*models.User, error) {
-	if inviteOrgId == nil {
-		return user, nil
-	}
-	if userEmail != nil && *userEmail != primaryEmail {
+	if inviteOrgId == nil || (userEmail != nil && *userEmail != primaryEmail) {
 		organisation := &models.Organisation{
 			Name: s.orgService.CreateOrganisationName(),
 		}

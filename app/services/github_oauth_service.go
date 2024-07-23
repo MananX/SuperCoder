@@ -159,10 +159,7 @@ func (s *GithubOauthService) handleExistingUserOrg(user *models.User, inviteOrgI
 }
 
 func (s *GithubOauthService) handleNewUserOrg(user *models.User, inviteOrgId *int, userEmail *string, primaryEmail string) (*models.User, error) {
-	if inviteOrgId == nil {
-		return user, nil
-	}
-	if userEmail != nil && *userEmail != primaryEmail {
+	if inviteOrgId == nil || (userEmail != nil && *userEmail != primaryEmail) {
 		organisation := &models.Organisation{
 			Name: s.organisationService.CreateOrganisationName(),
 		}
