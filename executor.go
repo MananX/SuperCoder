@@ -155,6 +155,11 @@ func main() {
 		log.Println("Error providing llm api key repository:", err)
 		panic(err)
 	}
+	err = c.Provide(repositories.NewUserRepository)
+	if err != nil {
+		log.Println("Error providing organisation user repository:", err)
+		panic(err)
+	}
 	err = c.Provide(repositories.NewOrganisationUserRepository)
 	if err != nil {
 		log.Println("Error providing organisation user repository:", err)
@@ -191,6 +196,7 @@ func main() {
 	//Provide Services
 	_ = c.Provide(client.NewHttpClient)
 	_ = c.Provide(postmark.NewPostmarkClient)
+	_ = c.Provide(services.NewJwtService)
 	_ = c.Provide(services.NewOrganisationService)
 	_ = c.Provide(services.NewProjectService)
 	_ = c.Provide(services.NewExecutionService)

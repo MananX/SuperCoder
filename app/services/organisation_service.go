@@ -23,7 +23,6 @@ type OrganisationService struct {
 	gitnessService   *git_providers.GitnessService
 	userRepository   *repositories.UserRepository
 	JWTService       *JWTService
-	userRepo         *repositories.UserRepository
 	emailService     email.EmailService
 }
 
@@ -77,14 +76,13 @@ func (s *OrganisationService) GetOrganisationByID(organisationID uint) (*models.
 }
 
 func NewOrganisationService(organisationRepo *repositories.OrganisationRepository, gitnessService *git_providers.GitnessService, userRepository *repositories.UserRepository,
-	emailService email.EmailService, jwtService *JWTService, userRepo *repositories.UserRepository) *OrganisationService {
+	emailService email.EmailService, jwtService *JWTService) *OrganisationService {
 	return &OrganisationService{
 		organisationRepo: organisationRepo,
 		gitnessService:   gitnessService,
 		userRepository:   userRepository,
 		emailService:     emailService,
 		JWTService:       jwtService,
-		userRepo:         userRepo,
 	}
 }
 
@@ -122,7 +120,7 @@ func (s *OrganisationService) InviteUserToOrganization(organisationID int, userE
 		}, err
 	}
 	url := config.AppUrl() + "/api/organisation/handle_invite?invite_token=" + accessToken
-	currentUser, err := s.userRepo.GetUserByID(uint(currentUserID))
+	currentUser, err := s.userRepository.GetUserByID(uint(currentUserID))
 	if err != nil {
 		return &response.SendEmailResponse{
 			Success:   false,
