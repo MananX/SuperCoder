@@ -148,7 +148,7 @@ func (s *GithubOauthService) handleExistingUserOrg(user *models.User, inviteOrgI
 	if inviteOrgId == nil {
 		return user, nil
 	}
-	if userEmail != nil && *userEmail != primaryEmail {
+	if userEmail != nil && *userEmail == primaryEmail {
 		user.OrganisationID = uint(*inviteOrgId)
 		_, err := s.createOrganisationUser(user)
 		if err != nil {
