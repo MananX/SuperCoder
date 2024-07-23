@@ -4,7 +4,6 @@ import (
 	"ai-developer/app/models"
 	"ai-developer/app/repositories"
 	"ai-developer/app/types/request"
-	"errors"
 	"fmt"
 	"golang.org/x/crypto/bcrypt"
 	"math/rand"
@@ -68,9 +67,6 @@ func (s *UserService) HandleUserSignUp(request request.CreateUserRequest, invite
 		inviteEmail, inviteOrganisationId, err = s.jwtService.DecodeInviteToken(inviteToken)
 		if err != nil {
 			return nil, "", err
-		}
-		if *inviteEmail != request.Email {
-			return nil, "", errors.New("invite email and user email do not match")
 		}
 	}
 	newUser, err = s.handleNewUserOrg(newUser, inviteOrganisationId, inviteEmail, request.Email)
