@@ -72,7 +72,7 @@ func (s *JWTService) DecodeInviteToken(tokenString string) (*string, *int, error
 	}
 
 	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
-		email, ok := claims["user_email"].(*string)
+		email, ok := claims["user_email"].(string)
 		if !ok {
 			return nil, nil, errors.New("invalid email in token")
 		}
@@ -82,7 +82,7 @@ func (s *JWTService) DecodeInviteToken(tokenString string) (*string, *int, error
 			return nil, nil, errors.New("invalid organisation_id in token")
 		}
 		organizationIdInt := int(organizationId)
-		return email, &organizationIdInt, nil
+		return &email, &organizationIdInt, nil
 	}
 	return nil, nil, errors.New("invalid token")
 }
