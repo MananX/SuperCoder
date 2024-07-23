@@ -20,6 +20,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/hibiken/asynq"
 	"github.com/knadh/koanf/v2"
@@ -193,10 +194,25 @@ func main() {
 		panic(err)
 	}
 
+	//Provide JWT Service
+	err = c.Provide(func() string {
+		return config.JWTSecret()
+	})
+	if err != nil {
+		panic(err)
+	}
+	err = c.Provide(func() time.Duration {
+		return config.JWTExpiryHours()
+	})
+	if err != nil {
+		panic(err)
+	}
+	err = c.Provide(func(secretKey string, jwtExpiryHours time.Duration) *services.JWTService {
+		return services.NewJwtService(secretKey, jwtExpiryHours)
+	})
 	//Provide Services
 	_ = c.Provide(client.NewHttpClient)
 	_ = c.Provide(postmark.NewPostmarkClient)
-	_ = c.Provide(services.NewJwtService)
 	_ = c.Provide(services.NewOrganisationService)
 	_ = c.Provide(services.NewProjectService)
 	_ = c.Provide(services.NewExecutionService)
