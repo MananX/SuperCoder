@@ -158,7 +158,7 @@ func main() {
 	}
 	err = c.Provide(repositories.NewUserRepository)
 	if err != nil {
-		log.Println("Error providing organisation user repository:", err)
+		log.Println("Error providing user repository:", err)
 		panic(err)
 	}
 	err = c.Provide(repositories.NewOrganisationUserRepository)
