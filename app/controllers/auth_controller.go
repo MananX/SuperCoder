@@ -126,7 +126,13 @@ func (controller *AuthController) SignIn(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		existingUser, err = controller.userService.HandleExistingUserOrg(existingUser, inviteOrganisationId, inviteEmail, existingUser.Email)
+		if inviteEmail != nil && inviteOrganisationId != nil {
+			existingUser, err = controller.userService.HandleUserInvite(existingUser, inviteOrganisationId, inviteEmail, existingUser.Email)
+			if err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+				return
+			}
+		}
 	}
 
 	c.JSON(http.StatusOK, gin.H{"success": true, "user": &response.UserResponse{

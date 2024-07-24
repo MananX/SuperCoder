@@ -68,8 +68,18 @@ func (s *UserService) HandleUserSignUp(request request.CreateUserRequest, invite
 		if err != nil {
 			return nil, "", err
 		}
+		newUser, err = s.HandleUserInvite(newUser, inviteOrganisationId, inviteEmail, request.Email)
+		if err != nil {
+			return nil, "", err
+		}
 	}
-	newUser, err = s.handleNewUserOrg(newUser, inviteOrganisationId, inviteEmail, request.Email)
+	if newUser.OrganisationID == 0 {
+		organisation := &models.Organisation{
+			Name: s.orgService.CreateOrganisationName(),
+		}
+		organisation, err = s.orgService.CreateOrganisation(organisation)
+		newUser.OrganisationID = organisation.ID
+	}
 	newUser, err = s.CreateUser(newUser)
 	if err != nil {
 		fmt.Println("Error while creating user: ", err.Error())
@@ -97,36 +107,13 @@ func (s *UserService) VerifyUserPassword(password string, hash string) bool {
 	return err == nil
 }
 
-func (s *UserService) HandleExistingUserOrg(user *models.User, inviteOrgId *int, userEmail *string, primaryEmail string) (*models.User, error) {
-	if inviteOrgId == nil {
-		return user, nil
-	}
+func (s *UserService) HandleUserInvite(user *models.User, inviteOrgId *int, userEmail *string, primaryEmail string) (*models.User, error) {
 	if userEmail != nil && *userEmail == primaryEmail {
 		user.OrganisationID = uint(*inviteOrgId)
 		_, err := s.createOrganisationUser(user)
 		if err != nil {
 			fmt.Println("Error while creating Organisation User: ", err.Error())
 		}
-		err = s.userRepo.UpdateUserByEmail(user.Email, user)
-		if err != nil {
-			return nil, err
-		}
-	}
-	return user, nil
-}
-
-func (s *UserService) handleNewUserOrg(user *models.User, inviteOrgId *int, userEmail *string, primaryEmail string) (*models.User, error) {
-	if inviteOrgId == nil || (userEmail != nil && *userEmail != primaryEmail) {
-		organisation := &models.Organisation{
-			Name: s.orgService.CreateOrganisationName(),
-		}
-		organisation, err := s.orgService.CreateOrganisation(organisation)
-		if err != nil {
-			return nil, err
-		}
-		user.OrganisationID = organisation.ID
-	} else {
-		user.OrganisationID = uint(*inviteOrgId)
 	}
 	return user, nil
 }
