@@ -68,9 +68,11 @@ func (s *UserService) HandleUserSignUp(request request.CreateUserRequest, invite
 		if err != nil {
 			return nil, "", err
 		}
-		newUser, err = s.HandleUserInvite(newUser, inviteOrganisationId, inviteEmail, request.Email)
-		if err != nil {
-			return nil, "", err
+		if inviteEmail != nil && inviteOrganisationId != nil {
+			newUser, err = s.HandleUserInvite(newUser, inviteOrganisationId, inviteEmail, request.Email)
+			if err != nil {
+				return nil, "", err
+			}
 		}
 	}
 	if newUser.OrganisationID == 0 {
@@ -108,7 +110,7 @@ func (s *UserService) VerifyUserPassword(password string, hash string) bool {
 }
 
 func (s *UserService) HandleUserInvite(user *models.User, inviteOrgId *int, userEmail *string, primaryEmail string) (*models.User, error) {
-	if userEmail != nil && *userEmail == primaryEmail {
+	if *userEmail == primaryEmail {
 		user.OrganisationID = uint(*inviteOrgId)
 		_, err := s.createOrganisationUser(user)
 		if err != nil {

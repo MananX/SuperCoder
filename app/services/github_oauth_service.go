@@ -115,7 +115,7 @@ func (s *GithubOauthService) HandleGithubCallback(code string, state string) (st
 }
 
 func (s *GithubOauthService) handleUserInvite(user *models.User, inviteOrgId *int, userEmail *string, primaryEmail string) (*models.User, error) {
-	if userEmail != nil && *userEmail == primaryEmail {
+	if *userEmail == primaryEmail {
 		user.OrganisationID = uint(*inviteOrgId)
 		_, err := s.createOrganisationUser(user)
 		if err != nil {
