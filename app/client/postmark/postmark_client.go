@@ -43,16 +43,16 @@ func (c *PostmarkClient) SendOutboundEmail(sendEmailRequest *request.SendEmailRe
 		return nil, err
 	}
 	if emailResponse.ErrorCode == 0 {
+		messageID := emailResponse.MessageId
 		return &response.SendEmailResponse{
 			Success:   true,
-			MessageId: emailResponse.MessageId,
+			MessageId: &messageID,
 			Error:     "",
 		}, nil
 	}
-
 	return &response.SendEmailResponse{
 		Success:   false,
-		MessageId: "",
+		MessageId: nil,
 		Error:     emailResponse.Message,
 	}, nil
 }

@@ -49,29 +49,29 @@ func (s *UserService) UpdateUserByEmail(email string, user *models.User) error {
 	return s.userRepo.UpdateUserByEmail(email, user)
 }
 
-func (s *UserService) HandleUserSignUp(request request.CreateUserRequest, inviteToken string) (*models.User, string, error) {
+func (s *UserService) HandleUserSignUp(request request.CreateUserRequest, inviteToken *string) (*models.User, *string, error) {
 	var err error
 	var inviteOrganisationId *int
 	var inviteEmail *string
 	hashedPassword, err := s.HashUserPassword(request.Password)
-	if err != nil {
+	if err != nil || hashedPassword == nil {
 		fmt.Println("Error while hashing password: ", err.Error())
-		return nil, "", err
+		return nil, nil, err
 	}
 	newUser := &models.User{
 		Name:     request.Email,
 		Email:    request.Email,
-		Password: hashedPassword,
+		Password: *hashedPassword,
 	}
-	if inviteToken != "" {
+	if inviteToken != nil {
 		inviteEmail, inviteOrganisationId, err = s.jwtService.DecodeInviteToken(inviteToken)
 		if err != nil {
-			return nil, "", err
+			return nil, nil, err
 		}
 		if inviteEmail != nil && inviteOrganisationId != nil {
 			newUser, err = s.HandleUserInvite(newUser, inviteOrganisationId, inviteEmail, request.Email)
 			if err != nil {
-				return nil, "", err
+				return nil, nil, err
 			}
 		}
 	}
@@ -85,23 +85,24 @@ func (s *UserService) HandleUserSignUp(request request.CreateUserRequest, invite
 	newUser, err = s.CreateUser(newUser)
 	if err != nil {
 		fmt.Println("Error while creating user: ", err.Error())
-		return nil, "", err
+		return nil, nil, err
 	}
 	_, err = s.createOrganisationUser(newUser)
 	var accessToken, jwtErr = s.jwtService.GenerateToken(int(newUser.ID), newUser.Email)
 	if jwtErr != nil {
 		fmt.Println(" Jwt error: ", accessToken, jwtErr.Error())
-		return nil, "", nil
+		return nil, nil, nil
 	}
-	return newUser, accessToken, nil
+	return newUser, &accessToken, nil
 }
 
-func (s *UserService) HashUserPassword(password string) (string, error) {
+func (s *UserService) HashUserPassword(password string) (*string, error) {
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	return string(hashedPassword), nil
+	hashedPasswordString := string(hashedPassword)
+	return &hashedPasswordString, nil
 }
 
 func (s *UserService) VerifyUserPassword(password string, hash string) bool {

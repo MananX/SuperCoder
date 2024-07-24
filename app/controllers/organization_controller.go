@@ -29,7 +29,11 @@ func (controller *OrganizationController) FetchOrganizationUsers(c *gin.Context)
 		c.JSON(http.StatusBadRequest, &response.FetchOrganisationUserResponse{Success: false, Error: err.Error(), Users: nil})
 		return
 	}
-	users, err = controller.organizationService.GetOrganizationUsers(organizationID)
+	if organizationID == nil {
+		c.JSON(http.StatusBadRequest, &response.FetchOrganisationUserResponse{Success: false, Error: "Error while fetching user organisation", Users: nil})
+		return
+	}
+	users, err = controller.organizationService.GetOrganizationUsers(*organizationID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, &response.FetchOrganisationUserResponse{Success: false, Error: err.Error(), Users: nil})
 		return
@@ -48,16 +52,24 @@ func (controller *OrganizationController) InviteUserToOrganisation(c *gin.Contex
 	if err != nil {
 		c.JSON(http.StatusForbidden, &response.SendEmailResponse{
 			Success:   false,
-			MessageId: "",
+			MessageId: nil,
 			Error:     err.Error(),
 		})
 		return
 	}
-	sendEmailResponse, err := controller.organizationService.InviteUserToOrganization(int(organizationID), inviteUserRequest.Email, userId)
+	if organizationID == nil {
+		c.JSON(http.StatusForbidden, &response.SendEmailResponse{
+			Success:   false,
+			MessageId: nil,
+			Error:     "Error while fetching user organisation",
+		})
+		return
+	}
+	sendEmailResponse, err := controller.organizationService.InviteUserToOrganization(int(*organizationID), inviteUserRequest.Email, *userId)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, &response.SendEmailResponse{
 			Success:   false,
-			MessageId: "",
+			MessageId: nil,
 			Error:     err.Error(),
 		})
 		return
@@ -67,7 +79,7 @@ func (controller *OrganizationController) InviteUserToOrganisation(c *gin.Contex
 
 func (controller *OrganizationController) HandleUserInvite(c *gin.Context) {
 	var inviteToken = c.Query("invite_token")
-	email, _, err := controller.jwtService.DecodeInviteToken(inviteToken)
+	email, _, err := controller.jwtService.DecodeInviteToken(&inviteToken)
 	if err != nil {
 		redirectUrl := controller.appRedirectUrl + "?error_msg=INVALID_TOKEN"
 		c.Redirect(http.StatusTemporaryRedirect, redirectUrl)
@@ -88,12 +100,16 @@ func (controller *OrganizationController) RemoveUserFromOrganisation(c *gin.Cont
 		c.JSON(http.StatusForbidden, &response.FetchOrganisationUserResponse{Success: false, Error: "OrganisationID mismatch", Users: nil})
 		return
 	}
+	if organizationID == nil {
+		c.JSON(http.StatusBadRequest, &response.FetchOrganisationUserResponse{Success: false, Error: "Error while fetching user organisation", Users: nil})
+		return
+	}
 	user, err := controller.userService.GetUserByID(uint(userIDInt))
 	if user == nil {
 		c.JSON(http.StatusNotFound, &response.FetchOrganisationUserResponse{Success: false, Error: "User not found"})
 		return
 	}
-	if user.OrganisationID != organizationID {
+	if organizationID != nil && user.OrganisationID != *organizationID {
 		c.JSON(http.StatusForbidden, &response.FetchOrganisationUserResponse{Success: false, Error: "User does not belong to this organization"})
 		return
 	}
@@ -115,21 +131,21 @@ func (controller *OrganizationController) RemoveUserFromOrganisation(c *gin.Cont
 	c.JSON(http.StatusOK, &response.FetchOrganisationUserResponse{Success: true, Error: nil})
 }
 
-func (controller *OrganizationController) getOrganisationIDFromUserID(context *gin.Context) (uint, int, error) {
+func (controller *OrganizationController) getOrganisationIDFromUserID(context *gin.Context) (*uint, *int, error) {
 	userID, exists := context.Get("user_id")
 	if !exists {
-		return 0, 0, errors.New("userId not found in context")
+		return nil, nil, errors.New("userId not found in context")
 	}
 	userIDInt, ok := userID.(int)
 	if !ok {
 		context.JSON(http.StatusBadRequest, gin.H{"error": "User ID is not of type int"})
-		return 0, 0, errors.New("userId is not of type int")
+		return nil, nil, errors.New("userId is not of type int")
 	}
 	organisationIdByUserID, err := controller.userService.FetchOrganisationIDByUserID(uint(userIDInt))
 	if err != nil {
-		return 0, 0, err
+		return nil, nil, err
 	}
-	return organisationIdByUserID, userIDInt, nil
+	return &organisationIdByUserID, &userIDInt, nil
 }
 
 func NewOrganizationController(

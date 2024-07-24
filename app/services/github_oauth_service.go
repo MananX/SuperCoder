@@ -63,13 +63,13 @@ func (s *GithubOauthService) HandleGithubCallback(code string, state string) (st
 	if err != nil {
 		if user == nil {
 			hashedPassword, err := s.userService.HashUserPassword(s.userService.CreatePassword())
-			if err != nil {
+			if err != nil || hashedPassword == nil {
 				return "", "", "", "", 0, errors.New("error while hashing user password")
 			}
 			user = &models.User{
 				Name:     name,
 				Email:    primaryEmail,
-				Password: hashedPassword,
+				Password: *hashedPassword,
 			}
 			if err != nil {
 				return "", "", "", "", 0, err
@@ -145,7 +145,7 @@ func (s *GithubOauthService) createOrganisationUser(user *models.User) (*models.
 func (s *GithubOauthService) DecodeInviteToken(state string) (*string, *int, error) {
 	if strings.HasPrefix(state, "token:") {
 		tokenValue := strings.TrimPrefix(state, "token:")
-		userEmail, inviteOrgId, err := s.jwtService.DecodeInviteToken(tokenValue)
+		userEmail, inviteOrgId, err := s.jwtService.DecodeInviteToken(&tokenValue)
 		if err != nil {
 			return nil, nil, err
 		}

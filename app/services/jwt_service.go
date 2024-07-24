@@ -65,8 +65,11 @@ func (s *JWTService) ValidateToken(tokenString string) (*jwt.Token, error) {
 	return token, err
 }
 
-func (s *JWTService) DecodeInviteToken(tokenString string) (*string, *int, error) {
-	token, err := s.ValidateToken(tokenString)
+func (s *JWTService) DecodeInviteToken(tokenString *string) (*string, *int, error) {
+	if tokenString == nil {
+		return nil, nil, errors.New("token is empty")
+	}
+	token, err := s.ValidateToken(*tokenString)
 	if err != nil {
 		return nil, nil, err
 	}

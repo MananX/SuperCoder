@@ -9,6 +9,7 @@ import (
 	"ai-developer/app/types/request"
 	"ai-developer/app/types/response"
 	"bytes"
+	"errors"
 	"fmt"
 	"html/template"
 	"io"
@@ -115,7 +116,7 @@ func (s *OrganisationService) InviteUserToOrganization(organisationID int, userE
 	if err != nil {
 		return &response.SendEmailResponse{
 			Success:   false,
-			MessageId: "",
+			MessageId: nil,
 			Error:     err.Error(),
 		}, err
 	}
@@ -124,7 +125,7 @@ func (s *OrganisationService) InviteUserToOrganization(organisationID int, userE
 	if err != nil {
 		return &response.SendEmailResponse{
 			Success:   false,
-			MessageId: "",
+			MessageId: nil,
 			Error:     err.Error(),
 		}, err
 	}
@@ -132,44 +133,55 @@ func (s *OrganisationService) InviteUserToOrganization(organisationID int, userE
 	if err != nil {
 		return &response.SendEmailResponse{
 			Success:   false,
-			MessageId: "",
+			MessageId: nil,
 			Error:     err.Error(),
+		}, err
+	}
+	if body == nil {
+		return &response.SendEmailResponse{
+			Success:   false,
+			MessageId: nil,
+			Error:     "Unable to load invite email body",
 		}, err
 	}
 	sendEmailRequest := &request.SendEmailRequest{
 		ToEmail:     userEmail,
 		Content:     url,
-		HtmlContent: body,
+		HtmlContent: *body,
 		Subject:     "SuperCoder Invite",
 	}
 	return s.emailService.SendOutboundEmail(sendEmailRequest)
 }
 
-func getHtmlContent(url string, currentUserEmail string) (string, error) {
+func getHtmlContent(url string, currentUserEmail string) (*string, error) {
 	data := InviteEmailData{
 		InvitorEmail: currentUserEmail,
 		InviteURL:    url,
 	}
 	htmlContent, err := readFile(filepath.Join("/", "go", "email_templates", "invite_email.html"))
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	tmpl, err := template.New("inviteEmail").Parse(htmlContent)
+	if htmlContent == nil {
+		return nil, errors.New("unable to read invite.html")
+	}
+	tmpl, err := template.New("inviteEmail").Parse(*htmlContent)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	var body bytes.Buffer
 	err = tmpl.Execute(&body, data)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	return body.String(), nil
+	bodyString := body.String()
+	return &bodyString, nil
 }
 
-func readFile(filePath string) (string, error) {
+func readFile(filePath string) (*string, error) {
 	file, err := os.Open(filePath)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	defer func(file *os.File) {
 		err := file.Close()
@@ -180,8 +192,9 @@ func readFile(filePath string) (string, error) {
 
 	content, err := io.ReadAll(file)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	return string(content), nil
+	contentString := string(content)
+	return &contentString, nil
 }
