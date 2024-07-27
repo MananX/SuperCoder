@@ -3,6 +3,7 @@ package main
 import (
 	"ai-developer/app/client"
 	gitness_git_provider "ai-developer/app/client/git_provider"
+	"ai-developer/app/client/postmark"
 	"ai-developer/app/client/workspace"
 	"ai-developer/app/config"
 	"ai-developer/app/monitoring"
@@ -16,15 +17,14 @@ import (
 	"ai-developer/app/workflow_executors/step_executors/steps"
 	"context"
 	"fmt"
-	"log"
-	"net/http"
-	"os"
-
 	"github.com/hibiken/asynq"
 	"github.com/knadh/koanf/v2"
 	"go.uber.org/dig"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
+	"log"
+	"net/http"
+	"os"
 )
 
 func main() {
@@ -154,6 +154,16 @@ func main() {
 		log.Println("Error providing llm api key repository:", err)
 		panic(err)
 	}
+	err = c.Provide(repositories.NewUserRepository)
+	if err != nil {
+		log.Println("Error providing user repository:", err)
+		panic(err)
+	}
+	err = c.Provide(repositories.NewOrganisationUserRepository)
+	if err != nil {
+		log.Println("Error providing organisation user repository:", err)
+		panic(err)
+	}
 	// Provide Redis Client
 	err = c.Provide(config.InitRedis)
 	if err != nil {
@@ -182,7 +192,18 @@ func main() {
 		panic(err)
 	}
 
+	//Provide JWT Service
+	err = c.Provide(func() *services.JWTService {
+		return services.NewJwtService(
+			config.JWTSecret(),
+			config.JWTExpiryHours())
+	})
+	if err != nil {
+		panic(err)
+	}
 	//Provide Services
+	_ = c.Provide(client.NewHttpClient)
+	_ = c.Provide(postmark.NewPostmarkClient)
 	_ = c.Provide(services.NewOrganisationService)
 	_ = c.Provide(services.NewProjectService)
 	_ = c.Provide(services.NewExecutionService)
@@ -271,6 +292,11 @@ func main() {
 		log.Println("Error providing reset flask db step:", err)
 		panic(err)
 	}
+	err = c.Provide(impl.NewResetDjangoDBStepExecutor)
+	if err != nil {
+		log.Println("Error providing reset django db step:", err)
+		panic(err)
+	}
 	err = c.Provide(impl.NewPackageInstallStepExecutor)
 	if err != nil {
 		log.Println("Error providing package install step:", err)
@@ -319,6 +345,8 @@ func main() {
 			gitCommitExecutor *impl.GitCommitExecutor,
 			gitPushExecutor *impl.GitPushExecutor,
 			gitnessMakePullRequestExecutor *impl.GitnessMakePullRequestExecutor,
+			resetDjangoFlaskDBStepExecutor *impl.ResetDjangoDBStepExecutor,
+			poetryPackageInstallStepExecutor *impl.PackageInstallStepExecutor,
 		) map[steps.StepName]step_executors.StepExecutor {
 			return map[steps.StepName]step_executors.StepExecutor{
 				steps.CODE_GENERATE_STEP:           *openAICodeGenerator,
@@ -329,6 +357,8 @@ func main() {
 				steps.GIT_CREATE_PULL_REQUEST_STEP: *gitnessMakePullRequestExecutor,
 				steps.SERVER_START_STEP:            *djangoServerStartTestExecutor,
 				steps.RETRY_CODE_GENERATE_STEP:     *openAICodeGenerator,
+				steps.RESET_DB_STEP:                *resetDjangoFlaskDBStepExecutor,
+				steps.PACKAGE_INSTALL_STEP:         *poetryPackageInstallStepExecutor,
 			}
 		})
 	} else if template == "NEXTJS" {
@@ -336,6 +366,7 @@ func main() {
 			openAiNextJsCodeGenerator *impl.OpenAiNextJsCodeGenerator,
 			updateCodeFileExecutor *impl.NextJsUpdateCodeFileExecutor,
 			serverStartExecutor *impl.NextJsServerStartTestExecutor,
+			gitMakeBranchExecutor *impl.GitMakeBranchExecutor,
 		) map[steps.StepName]step_executors.StepExecutor {
 			return map[steps.StepName]step_executors.StepExecutor{
 				steps.CODE_GENERATE_CSS_STEP:       *openAiNextJsCodeGenerator,
@@ -347,6 +378,7 @@ func main() {
 				steps.SERVER_START_STEP:            *serverStartExecutor,
 				steps.RETRY_CODE_GENERATE_STEP:     *openAiNextJsCodeGenerator,
 				steps.UPDATE_CODE_FILE_STEP:        *updateCodeFileExecutor,
+				steps.GIT_CREATE_BRANCH_STEP:       *gitMakeBranchExecutor,
 			}
 		})
 	}
